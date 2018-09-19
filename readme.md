@@ -1,6 +1,10 @@
 ## Go :: Pool of workers
 Simple Pool of concurrent workers that allows to dynamically update / pause / resume live workers.
 
+## Prerequisites
+
+Golang version >= 1.9
+
 ## Installation
 ```bash
 go get gopkg.in/enriquebris/goworkerpool.v0
@@ -154,6 +158,10 @@ pool.WaitUntilNSuccesses(n)
 
 
 ## History
+
+### v0.7.1
+
+ - LateKillAllWorkers() will kill all alive workers (not only the number of workers that were alive when the function was invoked)
 
 ### v0.7
 
