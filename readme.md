@@ -159,6 +159,10 @@ pool.WaitUntilNSuccesses(n)
 
 ## History
 
+### v0.7.1
+
+ - LateKillAllWorkers() will kill all alive workers (not only the number of workers that were alive when the function was invoked)
+
 ### v0.7
 
  - Repository name modified to "goworkerpool"
