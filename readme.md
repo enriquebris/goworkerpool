@@ -1,6 +1,10 @@
 ## Go :: Pool of workers
 Simple Pool of concurrent workers that allows to dynamically update / pause / resume live workers.
 
+## Prerequisites
+
+Golang version >= 1.9
+
 ## Installation
 ```bash
 go get gopkg.in/enriquebris/goworkerpool.v0
