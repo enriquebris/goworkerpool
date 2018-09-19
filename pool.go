@@ -800,6 +800,7 @@ func (st *Pool) LateKillWorkers(n int) error {
 }
 
 // LateKillAllWorkers kills all live workers only after all current jobs get processed.
+// By "current jobs" it means: the number of enqueued jobs in the exact moment this function get executed.
 // It returns an error in case there is a "in course" KillAllWorkers operation.
 func (st *Pool) LateKillAllWorkers() error {
 	// return en error if there is an "in course" KillAllWorkers operation
