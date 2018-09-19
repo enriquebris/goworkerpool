@@ -34,6 +34,10 @@ const (
 	workerActionLateKill = "lateKill"
 	// confirm that a worker exited because a workerActionKillConfirmation signal
 	workerActionLateKillConfirmation = "lateKill.confirmation"
+	// "late kill all worker" signal
+	workerActionLateKillAllWorkers = "lateKillAllWorkers"
+	// confirm that a worker received the LateKillAllWorkers signal, ran: KillAllWorkers and exited.
+	workerActionLateKillAllWorkersConfirmation = "lateKillAllWorkers.confirmation"
 	// confirm that a worker exited because an unhandled panic
 	workerActionPanicKillConfirmation = "panicKill.confirmation"
 	// confirm that a worker exited because the immediate channel is closed
@@ -49,10 +53,21 @@ const (
 	// broad messages
 	broadMessagePause          = "pause"
 	broadMessageKillAllWorkers = "killAllWorkers"
+
+	// poolJobData codes
+	poolJobDataCodeRegular            = "regular"
+	poolJobDataCodeLateKillWorker     = "lateKillWorker"
+	poolJobDataCodeLateKillAllWorkers = "lateKillAllWorkers"
 )
 
 // PoolFunc defines the function signature to be implemented by the worker's func
 type PoolFunc func(interface{}) bool
+
+// poolJobData contains the job data && internal pool data
+type poolJobData struct {
+	Code    string
+	JobData interface{}
+}
 
 type Pool struct {
 	// function to be executed by the workers
@@ -74,7 +89,7 @@ type Pool struct {
 	// how many workers failed
 	fnFailCounter int
 	// channel to send jobs, workers listen to this channel
-	jobsChan chan interface{}
+	jobsChan chan poolJobData
 	// channel to keep track of how many workers are up
 	totalWorkersChan chan workerAction
 	// channel to keep track of succeeded / failed jobs
@@ -117,7 +132,7 @@ func NewPool(initialWorkers int, maxJobsInChannel int, verbose bool) *Pool {
 }
 
 func (st *Pool) initialize(initialWorkers int, maxJobsInChannel int, verbose bool) {
-	st.jobsChan = make(chan interface{}, maxJobsInChannel)
+	st.jobsChan = make(chan poolJobData, maxJobsInChannel)
 	st.totalWorkersChan = make(chan workerAction, 100)
 	// the package will cause deadlock if st.fnSuccessChan is full
 	st.fnSuccessChan = make(chan bool, maxJobsInChannel)
@@ -217,21 +232,33 @@ func (st *Pool) workerListener() {
 			case workerActionLateKill:
 				totalWorkers := st.GetTotalWorkers()
 				if message.Value > totalWorkers {
+					// TODO ::: return error ???
 					message.Value = totalWorkers
-				} else {
-					if message.Value == -1 {
-						message.Value = totalWorkers
-					}
 				}
 
 				for i := 0; i < message.Value; i++ {
-					st.jobsChan <- nil
+					st.jobsChan <- poolJobData{
+						Code:    poolJobDataCodeLateKillWorker,
+						JobData: nil,
+					}
 				}
 
 			// "late kill worker" confirmation from the worker
 			// the worker was killed because a "late kill" signal
 			case workerActionLateKillConfirmation:
 				st.totalWorkers -= message.Value
+
+			// late kill all workers
+			case workerActionLateKillAllWorkers:
+				// enqueue a unique LateKillAllWorkers message, then the worker who catches it will kill all other workers
+				st.jobsChan <- poolJobData{
+					Code:    poolJobDataCodeLateKillAllWorkers,
+					JobData: nil,
+				}
+
+			// "late kill all workers" was received and processed by a worker ("processed" ==> KillAllWorkers())
+			case workerActionLateKillAllWorkersConfirmation:
+				// TODO ::: stats
 
 			// "immediate channel closed kill worker" confirmation from the worker
 			// the worker was killed because the immediate channel is closed
@@ -526,8 +553,30 @@ func (st *Pool) workerFunc(n int) {
 					break
 				}
 
+				switch taskData.Code {
+
+				// regular job
+				case poolJobDataCodeRegular:
+					if st.doNotProcess {
+						// TODO ::: re-enqueue in a different queue/channel/struct
+						// re-enqueue the job / task
+						st.AddTask(taskData.JobData)
+
+					} else {
+						// execute the job
+						fnSuccess := st.fn(taskData.JobData)
+
+						// avoid to cause deadlock
+						if !st.doNotProcess {
+							// keep track of the job's result
+							st.fnSuccessChan <- fnSuccess
+						} else {
+							// TODO ::: save the job result ...
+						}
+					}
+
 				// late kill signal
-				if taskData == nil {
+				case poolJobDataCodeLateKillWorker:
 					if st.verbose {
 						log.Printf("[pool] worker %v is going to be down", n)
 					}
@@ -538,24 +587,31 @@ func (st *Pool) workerFunc(n int) {
 					// break the loop
 					keepWorking = false
 					break
-				}
 
-				if st.doNotProcess {
-					// TODO ::: re-enqueue in a different queue/channel/struct
-					// re-enqueue the job / task
-					st.AddTask(taskData)
-
-				} else {
-					// execute the job
-					fnSuccess := st.fn(taskData)
-
-					// avoid to cause deadlock
-					if !st.doNotProcess {
-						// keep track of the job's result
-						st.fnSuccessChan <- fnSuccess
-					} else {
-						// TODO ::: save the job result ...
+				// late kill all workers
+				case poolJobDataCodeLateKillAllWorkers:
+					if st.verbose {
+						log.Printf("[pool] worker %v is going to be down :: LateKillAllWorkers()", n)
 					}
+
+					// confirm that the worker was killed due to a workerActionLateKill signal
+					killWorkerConfirmation = workerActionLateKillConfirmation
+
+					// kill all live workers
+					st.KillAllWorkers()
+
+					// confirm that the LateKillAllWorkers() was received executed
+					st.totalWorkersChan <- workerAction{
+						Action: workerActionLateKillAllWorkersConfirmation,
+						Value:  1,
+					}
+
+					// break the loop
+					keepWorking = false
+					break
+
+				default:
+
 				}
 
 			default:
@@ -576,7 +632,11 @@ func (st *Pool) workerFunc(n int) {
 // It will return an error if no new tasks could be enqueued at the execution time.
 func (st *Pool) AddTask(data interface{}) error {
 	if !st.doNotProcess {
-		st.jobsChan <- data
+		// enqueue a regular job
+		st.jobsChan <- poolJobData{
+			Code:    poolJobDataCodeRegular,
+			JobData: data,
+		}
 		return nil
 	}
 
@@ -748,8 +808,7 @@ func (st *Pool) LateKillAllWorkers() error {
 	}
 
 	st.totalWorkersChan <- workerAction{
-		Action: workerActionLateKill,
-		Value:  -1,
+		Action: workerActionLateKillAllWorkers,
 	}
 
 	return nil
