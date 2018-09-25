@@ -165,6 +165,29 @@ func (st *Pool) initialize(initialWorkers int, maxJobsInChannel int, verbose boo
 func (st *Pool) workerListener() {
 	keepListening := true
 	for keepListening {
+
+		// ************************************************************************************
+		// ** Process first the following waitFor scenarios:  *********************************
+		// **	- Wait()
+		// ************************************************************************************
+		switch st.waitFor {
+		case waitForWait:
+			if st.workersStarted && st.GetTotalWorkers() == 0 {
+				// reset the st.waitFor variable to avoid processing again the "Wait ready" scenario
+				st.waitFor = ""
+				// send the signal to Wait() to let it know that no workers are alive
+				st.waitForWaitChannel <- true
+			}
+
+		case waitForNSuccesses:
+			// this case is handled by st.fnSuccessListener()
+
+		default:
+		}
+
+		// ************************************************************************************
+		// ** Process the actions over the workers  *******************************************
+		// ************************************************************************************
 		select {
 		case message, ok := <-st.totalWorkersChan:
 			// st.totalWorkersChan is closed
@@ -289,19 +312,8 @@ func (st *Pool) workerListener() {
 				st.AddWorkers(message.Value - currentTotalWorkers)
 			}
 
+		// no st.totalWorkersChan messages
 		default:
-			switch st.waitFor {
-			case waitForWait:
-				if st.workersStarted && st.GetTotalWorkers() == 0 {
-					// reset the st.waitFor variable to avoid processing again the "Wait ready" scenario
-					st.waitFor = ""
-					// send the signal to Wait() to let it know that no workers are alive
-					st.waitForWaitChannel <- true
-				}
-
-			case waitForNSuccesses:
-				// this case is handled by st.fnSuccessListener()
-			}
 		}
 	}
 }
