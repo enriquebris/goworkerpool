@@ -293,6 +293,8 @@ func (st *Pool) workerListener() {
 			switch st.waitFor {
 			case waitForWait:
 				if st.workersStarted && st.GetTotalWorkers() == 0 {
+					// reset the st.waitFor variable to avoid processing again the "Wait ready" scenario
+					st.waitFor = ""
 					// send the signal to Wait() to let it know that no workers are alive
 					st.waitForWaitChannel <- true
 				}
@@ -326,7 +328,7 @@ func (st *Pool) fnSuccessListener() {
 // Wait waits while at least one worker is up and running
 func (st *Pool) Wait() error {
 	if st.fn == nil {
-		return errors.Errorf(errorNoWorkerFuncMsg, "WaitUntilNSuccesses")
+		return errors.Errorf(errorNoWorkerFuncMsg, "Wait")
 	}
 
 	// set the waitFor flag for Wait()
@@ -334,9 +336,6 @@ func (st *Pool) Wait() error {
 
 	// wait here until all workers are done
 	<-st.waitForWaitChannel
-
-	// free the flag
-	st.waitFor = ""
 
 	if st.verbose {
 		log.Println("[pool] No active workers. Wait() finished.")
