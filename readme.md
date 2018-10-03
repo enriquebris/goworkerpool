@@ -1,4 +1,4 @@
-![version](https://img.shields.io/badge/version-v0.7.2-blue.svg?style=flat-square "goworkerpool v0.7.2") [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)
+![version](https://img.shields.io/badge/version-v0.7.2-blue.svg?style=flat "goworkerpool v0.7.2") [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)
 
 ## goworkerpool : Pool of workers
 Simple Pool of concurrent workers that allows to dynamically update / pause / resume live workers.
