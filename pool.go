@@ -15,6 +15,7 @@ const (
 	// error messages
 	errorNoWorkerFuncMsg   = "The Worker Func is needed to invoke %v. You should set it using SetWorkerFunc(...)"
 	errorKillAllWorkersMsg = "There is an active KillAllWorkers operation"
+	errorNoStartWorkersMsg = "StartWorkers() needs to be invoked before this action"
 
 	// "add new worker(s)" signal
 	workerActionAdd = "add"
@@ -144,10 +145,10 @@ func (st *Pool) initialize(initialWorkers int, maxJobsInChannel int, verbose boo
 
 	st.verbose = verbose
 
-	// goroutine that controls the active workers successes / fails
+	// GR to control the active workers successes / fails
 	go st.fnSuccessListener()
 
-	// goroutine that controls the active workers counter
+	// GR to control the active workers counter / actions over workers
 	go st.workerListener()
 
 	// worker's immediate action channel
@@ -406,6 +407,11 @@ func (st *Pool) SetWorkerFunc(fn PoolFunc) {
 // It adjusts the current number of live workers based on the given number. In case that it have to kill some workers, it will wait until the current jobs get processed.
 // It returns an error in case there is a "in course" KillAllWorkers operation.
 func (st *Pool) SetTotalWorkers(n int) error {
+	// verify that workers were started by StartWorkers()
+	if !st.workersStarted {
+		return errors.New(errorNoStartWorkersMsg)
+	}
+
 	// return en error if there is an "in course" KillAllWorkers operation
 	if tmp, ok := st.broadMessages.Load(broadMessageKillAllWorkers); ok && tmp.(bool) {
 		return errors.New(errorKillAllWorkersMsg)
