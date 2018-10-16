@@ -1,7 +1,6 @@
 // On this example:
-//  - 10 workers will be running
-//  - 100 jobs will be enqueued
-//  - all workers will exit after 30 jobs are successfully processed
+//  - 10 workers will be running forever
+//  - 30 jobs will be enqueued to be processed by the workers
 
 package main
 
@@ -17,12 +16,12 @@ func main() {
 	totalWorkers := 10
 	// max number of tasks waiting in the channel
 	maxNumberJobsInChannel := 15
-	// do not show messages about the pool processing
+	// do not log messages about the pool processing
 	verbose := false
 
 	pool := goworkerpool.NewPool(totalWorkers, maxNumberJobsInChannel, verbose)
 
-	// add the worker function
+	// add the worker function handler
 	pool.SetWorkerFunc(func(data interface{}) bool {
 		log.Printf("processing %v\n", data)
 		// add a 1 second delay (to makes it look as it were processing the job)
@@ -36,13 +35,16 @@ func main() {
 	// start up the workers
 	pool.StartWorkers()
 
-	// add tasks in a separate goroutine
+	// enqueue jobs in a separate goroutine
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 30; i++ {
 			pool.AddTask(i)
 		}
+
+		// kill all workers after the currently enqueued jobs get processed
+		pool.LateKillAllWorkers()
 	}()
 
 	// wait while at least one worker is alive
-	pool.WaitUntilNSuccesses(30)
+	pool.Wait()
 }

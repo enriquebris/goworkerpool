@@ -1,5 +1,9 @@
 ## History
 
+### v0.7.3
+
+ - SetTotalWorkers() returns error in case it is invoked before StartWorkers()
+
 ### v0.7.2
 
  - Fixed bug that prevents to start/add new workers after a Wait() function finishes.

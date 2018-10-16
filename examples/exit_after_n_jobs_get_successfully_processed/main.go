@@ -1,8 +1,9 @@
 // On this example:
-//  - 10 workers will be running forever
-//  - 30 jobs will be enqueued to be processed by the workers
+//  - 10 workers will be running
+//  - 100 jobs will be enqueued
+//  - all workers will exit after 30 jobs are successfully processed
 
-package main
+package exit_after_n_jobs_get_successfully_processed
 
 import (
 	"log"
@@ -37,11 +38,11 @@ func main() {
 
 	// add tasks in a separate goroutine
 	go func() {
-		for i := 0; i < 30; i++ {
+		for i := 0; i < 100; i++ {
 			pool.AddTask(i)
 		}
 	}()
 
 	// wait while at least one worker is alive
-	pool.Wait()
+	pool.WaitUntilNSuccesses(30)
 }
