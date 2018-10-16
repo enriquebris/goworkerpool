@@ -1,4 +1,8 @@
-// Package goworkerpool provides a simple way to manage a pool of workers and dynamically modify the number of workers.
+// ** goworkerpool.com  **********************
+// ** github.com/enriquebris/goworkerpool  ***
+// ** v0.7.3  ********************************
+
+// Package goworkerpool provides a pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
 package goworkerpool
 
 import (
@@ -645,8 +649,15 @@ func (st *Pool) workerFunc(n int) {
 	}
 }
 
-// AddTask adds a task/job to the FIFO queue.
-// It will return an error if no new tasks could be enqueued at the execution time.
+// AddTask will enqueue a job (in a FIFO way).
+// Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
+// the job will stay in the queue until any worker will be ready to pick it up and start processing it.
+//
+// The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddTask will wait
+// for a free queue slot to enqueue a new job in case the queue is at full capacity.
+//
+// It will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
+// a certain amount of time when WaitUntilNSuccesses meet the stop condition.
 func (st *Pool) AddTask(data interface{}) error {
 	if !st.doNotProcess {
 		// enqueue a regular job
@@ -661,7 +672,7 @@ func (st *Pool) AddTask(data interface{}) error {
 }
 
 // AddWorker adds a new worker to the pool.
-// It returns an error if at least one of the following statements are true:
+// It returns an error if at least one of the following statements is true:
 //  - the worker could not be started
 //  - there is a "in course" KillAllWorkers operation
 func (st *Pool) AddWorker() error {
