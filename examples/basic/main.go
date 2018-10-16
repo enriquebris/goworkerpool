@@ -14,14 +14,14 @@ import (
 func main() {
 	// total workers
 	totalWorkers := 10
-	// max number of tasks waiting in the channel
-	maxNumberJobsInChannel := 15
+	// max number of pending jobs
+	maxNumberPendingJobs := 15
 	// do not log messages about the pool processing
 	verbose := false
 
-	pool := goworkerpool.NewPool(totalWorkers, maxNumberJobsInChannel, verbose)
+	pool := goworkerpool.NewPool(totalWorkers, maxNumberPendingJobs, verbose)
 
-	// add the worker function handler
+	// add the worker handler function
 	pool.SetWorkerFunc(func(data interface{}) bool {
 		log.Printf("processing %v\n", data)
 		// add a 1 second delay (to makes it look as it were processing the job)
