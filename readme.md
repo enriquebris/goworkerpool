@@ -5,11 +5,11 @@ Pool of concurrent workers with the ability to increment / decrement / pause / r
 
 ## Features
 
-- [Enqueue jobs on demand](#Enqueue a job)
+- [Enqueue jobs on demand](#enqueue-a-job)
 - Multiple ways to wait / block
     - [Wait until at least a worker is alive](#wait-until-at-least-a-worker-is-alive)
     - [Wait until n jobs get successfully processed](#wait-until-n-jobs-get-successfully-processed)
-- [Add](#add-a-worker-on-demand) / [kill](#kill-a-worker-on-demand) workers on demand
+- [Add](#add-workers-on-demand) / [kill](#kill-workers-on-demand) workers on demand
 - Multiple ways to kill workers:
     - [On demand](#kill-workers-on-demand)
     - [After currently enqueued jobs get processed](#kill-workers-after-currently-enqueued-jobs-get-processed)
@@ -179,12 +179,19 @@ pool.Wait()
 pool.WaitUntilNSuccesses(n)
 ```
 
-### Add a worker on demand
+### Add workers on demand
+#### Add a worker on demand
+
+[AddWorker](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.AddWorker) adds a new worker to the pool.
+
 ```go
 pool.AddWorker()
 ```
 
-### Add workers on demand
+#### Add n workers on demand
+
+[AddWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.AddWorkers) adds n new workers to the pool.
+
 ```go
 pool.AddWorkers(n)
 ```
