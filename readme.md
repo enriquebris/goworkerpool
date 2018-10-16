@@ -1,16 +1,30 @@
-![version](https://img.shields.io/badge/version-v0.7.2-blue.svg?style=flat "goworkerpool v0.7.2") [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool) [![HitCount](http://hits.dwyl.io/enriquebris/goworkerpool.svg)](http://hits.dwyl.io/enriquebris/goworkerpool)
+[![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.7.2-yellowgreen.svg?style=flat "goworkerpool v0.7.2") [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)
 
-## goworkerpool : Pool of workers
-Simple Pool of concurrent workers that allows to dynamically update / pause / resume live workers.
+# goworkerpool - Pool of workers
+Pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
+
+## Features
+
+- [Change the number of workers on demand](#change-the-number-of-workers-on-demand)
+- [Pause](#pause-all-workers) / [resume](#resume-all-workers) all workers
+- Multiple ways to wait until jobs are done:
+    - Wait until currently enqueued jobs get processed
+    - Wait until n jobs get successfully processed
+    - Wait until all workers are down
 
 ## Prerequisites
 
 Golang version >= 1.9
 
 ## Installation
+Execute:
 ```bash
-go get gopkg.in/enriquebris/goworkerpool.v0
+go get -tags v0 github.com/enriquebris/goworkerpool
+
 ```
+
+## Documentation
+Visit [goworkerpool at godoc.org](https://godoc.org/github.com/enriquebris/goworkerpool)
 
 ## Examples
 
@@ -40,7 +54,7 @@ func main() {
 
 	pool := goworkerpool.NewPool(totalWorkers, maxNumberJobsInChannel, verbose)
 
-	// add the worker function
+	// add the worker function handler
 	pool.SetWorkerFunc(func(data interface{}) bool {
 		log.Printf("processing %v\n", data)
 		// add a 1 second delay (to makes it look as it were processing the job)
@@ -54,11 +68,14 @@ func main() {
 	// start up the workers
 	pool.StartWorkers()
 
-	// add tasks in a separate goroutine
+	// enqueue jobs in a separate goroutine
 	go func() {
 		for i := 0; i < 30; i++ {
 			pool.AddTask(i)
 		}
+		
+		// kill all workers after the currently enqueued jobs get processed
+		pool.LateKillAllWorkers()
 	}()
 
 	// wait while at least one worker is alive
@@ -67,7 +84,9 @@ func main() {
 
 ```
 
-#### Set the worker's function
+### How To
+
+#### Set the worker's function handler
 
 Each time a worker receives a job, it invokes this function passing the job data as the only parameter.
 
@@ -81,6 +100,11 @@ pool.SetWorkerFunc(func(data interface{}) bool {
 ```
 
 #### Enqueue a job
+*AddTask* will enqueue jobs in a FIFO way. Workers (if alive) will be listening to and picking up jobs from this queue.
+If no workers are alive nor idle, the job will stay in the queue until any worker will be ready to pick it up and start processing it.
+
+This queue has a limit (it was set up at pool initialization).
+
 ```go
 pool.AddTask(data)
 ```
@@ -109,12 +133,12 @@ pool.AddTask(JobData{
 
 Keep in mind that the worker's function needs to cast the parameter as a JobData (that is on your side).
 
-#### Add an extra worker on the fly
+#### Add an extra worker on demand
 ```go
 pool.AddWorker()
 ```
 
-#### Kill a worker on the fly
+#### Kill a worker on demand
 
 Kill a live worker once it is idle or it finishes its current job.
 
@@ -122,7 +146,7 @@ Kill a live worker once it is idle or it finishes its current job.
 pool.KillWorker()
 ```
 
-#### Set the number of workers on the fly
+#### <a name="change-the-number-of-workers-on-demand"></a>Change the number of workers on demand
 
 Adjust the total of live workers by the given number.
 
@@ -158,8 +182,28 @@ The worker function returns true or false. True means that the job was successfu
 pool.WaitUntilNSuccesses(n)
 ```
 
+#### Pause all workers
+
+All workers will be paused immediately after they finish processing their current jobs.
+No new jobs will be taken from the queue until [ResumeAllWorkers()](#resume-all-workers) be invoked.
+
+```go
+pool.PauseAllWorkers()
+```
+
+#### Resume all workers
+
+All workers will be resumed immediately.
+
+```go
+pool.ResumeAllWorkers()
+```
 
 ## History
+
+### v0.7.3
+
+ - SetTotalWorkers() returns error in case it is invoked before StartWorkers()
 
 ### v0.7.2
 
