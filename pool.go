@@ -128,19 +128,19 @@ type workerAction struct {
 }
 
 // NewPool creates, initializes and return a *Pool
-func NewPool(initialWorkers int, maxJobsInChannel int, verbose bool) *Pool {
+func NewPool(initialWorkers int, maxJobsInQueue int, verbose bool) *Pool {
 	ret := &Pool{}
 
-	ret.initialize(initialWorkers, maxJobsInChannel, verbose)
+	ret.initialize(initialWorkers, maxJobsInQueue, verbose)
 
 	return ret
 }
 
-func (st *Pool) initialize(initialWorkers int, maxJobsInChannel int, verbose bool) {
-	st.jobsChan = make(chan poolJobData, maxJobsInChannel)
+func (st *Pool) initialize(initialWorkers int, maxJobsInQueue int, verbose bool) {
+	st.jobsChan = make(chan poolJobData, maxJobsInQueue)
 	st.totalWorkersChan = make(chan workerAction, 100)
 	// the package will cause deadlock if st.fnSuccessChan is full
-	st.fnSuccessChan = make(chan bool, maxJobsInChannel)
+	st.fnSuccessChan = make(chan bool, maxJobsInQueue)
 
 	// the workers were not started at this point
 	st.workersStarted = false
@@ -400,16 +400,21 @@ func (st *Pool) WaitUntilNSuccesses(n int) error {
 	return nil
 }
 
-// SetWorkerFunc sets the worker's function.
-// This function will be invoked each time a worker receives a new job, and should return true to let know that the job
+// SetWorkerFunc sets the worker's function handler.
+// This function will be invoked each time a worker pulls a new job, and should return true to let know that the job
 // was successfully completed, or false in other case.
 func (st *Pool) SetWorkerFunc(fn PoolFunc) {
 	st.fn = fn
 }
 
-// SetTotalWorkers sets the number of live workers.
-// It adjusts the current number of live workers based on the given number. In case that it have to kill some workers, it will wait until the current jobs get processed.
-// It returns an error in case there is a "in course" KillAllWorkers operation.
+// SetTotalWorkers adjusts the number of live workers.
+//
+// In case it needs to kill some workers (in order to adjust the total based on the given parameter), it will wait until
+// their current jobs get processed (in case they are processing jobs).
+//
+// It returns an error in the following scenarios:
+//  - The workers were not started yet by StartWorkers.
+//  - There is a "in course" KillAllWorkers operation.
 func (st *Pool) SetTotalWorkers(n int) error {
 	// verify that workers were started by StartWorkers()
 	if !st.workersStarted {
@@ -649,14 +654,17 @@ func (st *Pool) workerFunc(n int) {
 	}
 }
 
-// AddTask will enqueue a job (in a FIFO way).
+// AddTask will enqueue a job (into a FIFO queue: a channel).
+//
+// The parameter for the job's data accepts any kind of value (interface{}).
+//
 // Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
 // the job will stay in the queue until any worker will be ready to pick it up and start processing it.
 //
 // The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddTask will wait
 // for a free queue slot to enqueue a new job in case the queue is at full capacity.
 //
-// It will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
+// AddTask will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
 // a certain amount of time when WaitUntilNSuccesses meet the stop condition.
 func (st *Pool) AddTask(data interface{}) error {
 	if !st.doNotProcess {
