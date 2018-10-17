@@ -1,6 +1,6 @@
-// ** goworkerpool.com  **********************
-// ** github.com/enriquebris/goworkerpool  ***
-// ** v0.7.3  ********************************
+// ** goworkerpool.com  **********************************************************************************************
+// ** github.com/enriquebris/goworkerpool  																			**
+// ** v0.7.4  ********************************************************************************************************
 
 // Package goworkerpool provides a pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
 package goworkerpool
@@ -136,6 +136,7 @@ func NewPool(initialWorkers int, maxJobsInQueue int, verbose bool) *Pool {
 	return ret
 }
 
+// pool internal initialization
 func (st *Pool) initialize(initialWorkers int, maxJobsInQueue int, verbose bool) {
 	st.jobsChan = make(chan poolJobData, maxJobsInQueue)
 	st.totalWorkersChan = make(chan workerAction, 100)
@@ -152,14 +153,14 @@ func (st *Pool) initialize(initialWorkers int, maxJobsInQueue int, verbose bool)
 	// GR to control the active workers successes / fails
 	go st.fnSuccessListener()
 
-	// GR to control the active workers counter / actions over workers
-	go st.workerListener()
-
 	// worker's immediate action channel
 	st.immediateChan = make(chan byte)
 
 	st.waitForWaitChannel = make(chan bool)
 	st.waitForNSuccessesChannel = make(chan bool)
+
+	// GR to control the active workers counter / actions over workers
+	go st.workerListener()
 
 	// set broad messages default values
 	st.broadMessages.Store(broadMessagePause, false)
@@ -342,6 +343,10 @@ func (st *Pool) fnSuccessListener() {
 	}
 }
 
+// *************************************************************************************************************
+// ** Wait functions  ******************************************************************************************
+// *************************************************************************************************************
+
 // Wait waits while at least one worker is up and running
 func (st *Pool) Wait() error {
 	if st.fn == nil {
@@ -400,6 +405,10 @@ func (st *Pool) WaitUntilNSuccesses(n int) error {
 	return nil
 }
 
+// *************************************************************************************************************
+// ** Set Handler Function  ************************************************************************************
+// *************************************************************************************************************
+
 // SetWorkerFunc sets the worker's function handler.
 // This function will be invoked each time a worker pulls a new job, and should return true to let know that the job
 // was successfully completed, or false in other case.
@@ -407,33 +416,38 @@ func (st *Pool) SetWorkerFunc(fn PoolFunc) {
 	st.fn = fn
 }
 
-// SetTotalWorkers adjusts the number of live workers.
+// *************************************************************************************************************
+// ** Enqueue jobs  ********************************************************************************************
+// *************************************************************************************************************
+
+// AddTask will enqueue a job (into a FIFO queue: a channel).
 //
-// In case it needs to kill some workers (in order to adjust the total based on the given parameter), it will wait until
-// their current jobs get processed (in case they are processing jobs).
+// The parameter for the job's data accepts any kind of value (interface{}).
 //
-// It returns an error in the following scenarios:
-//  - The workers were not started yet by StartWorkers.
-//  - There is a "in course" KillAllWorkers operation.
-func (st *Pool) SetTotalWorkers(n int) error {
-	// verify that workers were started by StartWorkers()
-	if !st.workersStarted {
-		return errors.New(errorNoStartWorkersMsg)
+// Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
+// the job will stay in the queue until any worker will be ready to pick it up and start processing it.
+//
+// The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddTask will wait
+// for a free queue slot to enqueue a new job in case the queue is at full capacity.
+//
+// AddTask will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
+// a certain amount of time when WaitUntilNSuccesses meet the stop condition.
+func (st *Pool) AddTask(data interface{}) error {
+	if !st.doNotProcess {
+		// enqueue a regular job
+		st.jobsChan <- poolJobData{
+			Code:    poolJobDataCodeRegular,
+			JobData: data,
+		}
+		return nil
 	}
 
-	// return en error if there is an "in course" KillAllWorkers operation
-	if tmp, ok := st.broadMessages.Load(broadMessageKillAllWorkers); ok && tmp.(bool) {
-		return errors.New(errorKillAllWorkersMsg)
-	}
-
-	// sends a "set total workers" signal, to be processed by workerListener()
-	st.totalWorkersChan <- workerAction{
-		Action: workerActionSetTotalWorkers,
-		Value:  n,
-	}
-
-	return nil
+	return errors.New("No new jobs are accepted at this moment")
 }
+
+// *************************************************************************************************************
+// ** Workers operations  **************************************************************************************
+// *************************************************************************************************************
 
 // StartWorkers start all workers. The number of workers was set at the Pool instantiation (NewPool(...) function).
 // It will return an error if the worker function was not previously set.
@@ -601,7 +615,7 @@ func (st *Pool) workerFunc(n int) {
 						}
 					}
 
-				// late kill signal
+					// late kill signal
 				case poolJobDataCodeLateKillWorker:
 					if st.verbose {
 						log.Printf("[pool] worker %v is going to be down", n)
@@ -614,7 +628,7 @@ func (st *Pool) workerFunc(n int) {
 					keepWorking = false
 					break
 
-				// late kill all workers
+					// late kill all workers
 				case poolJobDataCodeLateKillAllWorkers:
 					if st.verbose {
 						log.Printf("[pool] worker %v is going to be down :: LateKillAllWorkers()", n)
@@ -654,29 +668,36 @@ func (st *Pool) workerFunc(n int) {
 	}
 }
 
-// AddTask will enqueue a job (into a FIFO queue: a channel).
+// *************************************************************************************************************
+// ** Workers adjustments && operations  ***********************************************************************
+// *************************************************************************************************************
+
+// SetTotalWorkers adjusts the number of live workers.
 //
-// The parameter for the job's data accepts any kind of value (interface{}).
+// In case it needs to kill some workers (in order to adjust the total based on the given parameter), it will wait until
+// their current jobs get processed (in case they are processing jobs).
 //
-// Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
-// the job will stay in the queue until any worker will be ready to pick it up and start processing it.
-//
-// The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddTask will wait
-// for a free queue slot to enqueue a new job in case the queue is at full capacity.
-//
-// AddTask will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
-// a certain amount of time when WaitUntilNSuccesses meet the stop condition.
-func (st *Pool) AddTask(data interface{}) error {
-	if !st.doNotProcess {
-		// enqueue a regular job
-		st.jobsChan <- poolJobData{
-			Code:    poolJobDataCodeRegular,
-			JobData: data,
-		}
-		return nil
+// It returns an error in the following scenarios:
+//  - The workers were not started yet by StartWorkers.
+//  - There is a "in course" KillAllWorkers operation.
+func (st *Pool) SetTotalWorkers(n int) error {
+	// verify that workers were started by StartWorkers()
+	if !st.workersStarted {
+		return errors.New(errorNoStartWorkersMsg)
 	}
 
-	return errors.New("No new jobs are accepted at this moment")
+	// return en error if there is an "in course" KillAllWorkers operation
+	if tmp, ok := st.broadMessages.Load(broadMessageKillAllWorkers); ok && tmp.(bool) {
+		return errors.New(errorKillAllWorkersMsg)
+	}
+
+	// sends a "set total workers" signal, to be processed by workerListener()
+	st.totalWorkersChan <- workerAction{
+		Action: workerActionSetTotalWorkers,
+		Value:  n,
+	}
+
+	return nil
 }
 
 // AddWorker adds a new worker to the pool.

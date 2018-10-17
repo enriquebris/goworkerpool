@@ -1,5 +1,9 @@
 ## History
 
+### v0.7.4
+
+ - Fixed bug that caused randomly worker initialization error
+
 ### v0.7.3
 
  - SetTotalWorkers() returns error in case it is invoked before StartWorkers()
