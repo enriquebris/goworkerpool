@@ -152,14 +152,14 @@ func (st *Pool) initialize(initialWorkers int, maxJobsInQueue int, verbose bool)
 	// GR to control the active workers successes / fails
 	go st.fnSuccessListener()
 
-	// GR to control the active workers counter / actions over workers
-	go st.workerListener()
-
 	// worker's immediate action channel
 	st.immediateChan = make(chan byte)
 
 	st.waitForWaitChannel = make(chan bool)
 	st.waitForNSuccessesChannel = make(chan bool)
+
+	// GR to control the active workers counter / actions over workers
+	go st.workerListener()
 
 	// set broad messages default values
 	st.broadMessages.Store(broadMessagePause, false)
