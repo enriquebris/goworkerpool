@@ -1,4 +1,4 @@
-[![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.7.3-yellowgreen.svg?style=flat "goworkerpool v0.7.3")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://travis-ci.org/enriquebris/goworkerpool.svg?branch=master)](https://travis-ci.org/enriquebris/goworkerpool) 
+[![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.7.4-yellowgreen.svg?style=flat "goworkerpool v0.7.3")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://travis-ci.org/enriquebris/goworkerpool.svg?branch=master)](https://travis-ci.org/enriquebris/goworkerpool) 
 
 # goworkerpool - Pool of workers
 Pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
@@ -297,6 +297,10 @@ pool.ResumeAllWorkers()
 ```
 
 ## History
+
+### v0.7.4
+
+ - Fixed bug that caused randomly worker initialization error
 
 ### v0.7.3
 
