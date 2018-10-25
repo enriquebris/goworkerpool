@@ -31,6 +31,9 @@ go get -tags v0 github.com/enriquebris/goworkerpool
 ## Documentation
 Visit [goworkerpool at godoc.org](https://godoc.org/github.com/enriquebris/goworkerpool)
 
+## TODO
+Visit the [TODO](./todo.md) page.
+
 ## Get started
 
 #### Simple usage
