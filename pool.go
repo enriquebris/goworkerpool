@@ -1,6 +1,6 @@
 // ** goworkerpool.com  **********************************************************************************************
 // ** github.com/enriquebris/goworkerpool  																			**
-// ** v0.7.4  ********************************************************************************************************
+// ** v0.8.0  ********************************************************************************************************
 
 // Package goworkerpool provides a pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
 package goworkerpool
@@ -61,6 +61,7 @@ const (
 
 	// poolJobData codes
 	poolJobDataCodeRegular            = "regular"
+	poolJobDataCodeComplex            = "complex"
 	poolJobDataCodeLateKillWorker     = "lateKillWorker"
 	poolJobDataCodeLateKillAllWorkers = "lateKillAllWorkers"
 )
@@ -70,8 +71,10 @@ type PoolFunc func(interface{}) bool
 
 // poolJobData contains the job data && internal pool data
 type poolJobData struct {
-	Code    string
-	JobData interface{}
+	Code         string
+	JobData      interface{}
+	Category     string
+	CallbackFunc PoolFunc
 }
 
 type Pool struct {
@@ -422,7 +425,7 @@ func (st *Pool) SetWorkerFunc(fn PoolFunc) {
 
 // AddTask will enqueue a job (into a FIFO queue: a channel).
 //
-// The parameter for the job's data accepts any kind of value (interface{}).
+// The parameter for the job's data accepts any type (interface{}).
 //
 // Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
 // the job will stay in the queue until any worker will be ready to pick it up and start processing it.
@@ -438,6 +441,35 @@ func (st *Pool) AddTask(data interface{}) error {
 		st.jobsChan <- poolJobData{
 			Code:    poolJobDataCodeRegular,
 			JobData: data,
+		}
+		return nil
+	}
+
+	return errors.New("No new jobs are accepted at this moment")
+}
+
+// AddComplexTask is similar to AddTask allowing the following extra parameters:
+//	- category
+//	- callback ==> function to be invoked just after the job gets processed
+//
+// The parameter for the job's data (required) accepts any type (interface{}).
+//
+// Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
+// the job will stay in the queue until any worker will be ready to pick it up and start processing it.
+//
+// The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddTask will wait
+// for a free queue slot to enqueue a new job in case the queue is at full capacity.
+//
+// AddComplexTask will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
+// a certain amount of time when WaitUntilNSuccesses meet the stop condition.
+func (st *Pool) AddComplexTask(data interface{}, category string, callbackFn PoolFunc) error {
+	if !st.doNotProcess {
+		// enqueue a regular job
+		st.jobsChan <- poolJobData{
+			Code:         poolJobDataCodeComplex,
+			JobData:      data,
+			Category:     category,
+			CallbackFunc: callbackFn,
 		}
 		return nil
 	}
@@ -601,7 +633,6 @@ func (st *Pool) workerFunc(n int) {
 						// TODO ::: re-enqueue in a different queue/channel/struct
 						// re-enqueue the job / task
 						st.AddTask(taskData.JobData)
-
 					} else {
 						// execute the job
 						fnSuccess := st.fn(taskData.JobData)
@@ -615,7 +646,30 @@ func (st *Pool) workerFunc(n int) {
 						}
 					}
 
-					// late kill signal
+				// complex job:: category ||/&& callback
+				case poolJobDataCodeComplex:
+					if st.doNotProcess {
+						// TODO ::: re-enqueue in a different queue/channel/struct
+						// re-enqueue the job / task
+						st.AddComplexTask(taskData.JobData, taskData.Category, taskData.CallbackFunc)
+					} else {
+						// execute the job
+						fnSuccess := st.fn(taskData.JobData)
+						if taskData.CallbackFunc != nil {
+							// callback
+							taskData.CallbackFunc(taskData.JobData)
+						}
+
+						// avoid to cause deadlock
+						if !st.doNotProcess {
+							// keep track of the job's result
+							st.fnSuccessChan <- fnSuccess
+						} else {
+							// TODO ::: save the job result ...
+						}
+					}
+
+				// late kill signal
 				case poolJobDataCodeLateKillWorker:
 					if st.verbose {
 						log.Printf("[pool] worker %v is going to be down", n)
@@ -628,7 +682,7 @@ func (st *Pool) workerFunc(n int) {
 					keepWorking = false
 					break
 
-					// late kill all workers
+				// late kill all workers
 				case poolJobDataCodeLateKillAllWorkers:
 					if st.verbose {
 						log.Printf("[pool] worker %v is going to be down :: LateKillAllWorkers()", n)

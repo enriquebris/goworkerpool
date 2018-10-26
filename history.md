@@ -1,5 +1,9 @@
 ## History
 
+### v0.8.0
+
+ - Enqueue jobs with category and callback
+
 ### v0.7.4
 
  - Fixed bug that caused randomly worker initialization error
