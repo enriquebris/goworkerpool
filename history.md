@@ -1,5 +1,10 @@
 ## History
 
+### v0.8.0
+
+ - Enqueue jobs plus callback functions
+ - Enqueue callback functions without jobs' data
+
 ### v0.7.4
 
  - Fixed bug that caused randomly worker initialization error
