@@ -2,7 +2,8 @@
 
 ### v0.8.0
 
- - Enqueue jobs with category and callback
+ - Enqueue jobs plus callback functions
+ - Enqueue callback functions without jobs' data
 
 ### v0.7.4
 

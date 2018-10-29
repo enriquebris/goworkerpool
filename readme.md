@@ -141,7 +141,47 @@ The queue in which this function enqueues the jobs has a limit (it was set up at
 for a free queue slot to enqueue a new job in case the queue is at full capacity.
 
 AddTask will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
-a certain amount of time when [WaitUntilNSuccesses](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.WaitUntilNSuccesses) meet the stop condition.
+a certain amount of time when [WaitUntilNSuccesses](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.WaitUntilNSuccesses) meets the stop condition.
+
+#### Enqueue a simple job plus callback function
+
+[AddTaskCallback](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.AddTaskCallback) will enqueue a job plus a callback function into a FIFO queue (a channel).
+
+```go
+pool.AddTaskCallback(data, callback)
+```
+
+The parameter for the job's data accepts any type (interface{}).
+
+Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
+the job will stay in the queue until any worker will be ready to pick it up and start processing it.
+
+The worker who picks up this job + callback will process the job first and later will invoke the callback function, passing the job's data as a parameter.
+
+The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddTaskCallback will wait
+for a free queue slot to enqueue a new job in case the queue is at full capacity.
+
+AddTaskCallback will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
+a certain amount of time when [WaitUntilNSuccesses](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.WaitUntilNSuccesses) meets the stop condition.
+
+#### Enqueue a callback function
+
+[AddCallback](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.AddCallback) will enqueue a callback function into a FIFO queue (a channel).
+
+```go
+pool.AddCallback(callback)
+```
+
+Workers (if alive) will be listening to and picking up jobs from this queue. If no workers are alive nor idle,
+the job will stay in the queue until any worker will be ready to pick it up and start processing it.
+
+The worker who picks up this task will only invoke the callback function, passing nil as a parameter.
+
+The queue in which this function enqueues the jobs has a limit (it was set up at pool initialization). It means that AddCallback will wait
+for a free queue slot to enqueue a new job in case the queue is at full capacity.
+
+AddCallback will return an error if no new tasks could be enqueued at the execution time. No new tasks could be enqueued during
+a certain amount of time when [WaitUntilNSuccesses](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.WaitUntilNSuccesses) meets the stop condition.
 
 #### Enqueue a job with category and callback
 
@@ -318,7 +358,8 @@ pool.ResumeAllWorkers()
 
 ### v0.8.0
 
- - Enqueue jobs with category and callback
+ - Enqueue jobs plus callback functions
+ - Enqueue callback functions without jobs' data
 
 ### v0.7.4
 
