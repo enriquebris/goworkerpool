@@ -1,7 +1,7 @@
 # TODO
 
 - [ ] Add categories to jobs.
-- [ ] Add a AddTaskCallback function to enqueue a callback as a job.
+- [x] Add a AddTaskCallback function to enqueue a callback as a job.
 - [ ] [Catch concurrent panics caused by the worker handler function](#catch-concurrent-panics-caused-by-the-worker-handler-function).
 - [ ] Provide better examples.
 
