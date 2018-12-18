@@ -123,6 +123,26 @@ pool.SetWorkerFunc(func(data interface{}) bool {
 	})
 ```
 
+### Start up the workers
+
+[StartWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.StartWorkers) spins up the workers. The amount of workers to be started up is defined at the Pool instantiation.
+
+```go
+pool.StartWorkers()
+```
+
+This is an asynchronous operation, but there is a way to be be notified each time a new worker is started up: through a channel. See [SetNewWorkerChan(chan)](#receive-a-notification-every-time-a-new-worker-is-started-up).
+
+### Receive a notification every time a new worker is started up
+
+[SetNewWorkerChan(chan)](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.SetNewWorkerChan) sets a channel to receive notifications every time a new worker is started up.
+
+```go
+pool.SetNewWorkerChan(ch chan<- int)
+```
+
+This is optional, no channel is needed to start up new workers. Basically is just a way to give feedback for the worker's start up operation.
+
 ### Enqueue jobs on demand
 #### Enqueue a simple job
 
@@ -246,6 +266,8 @@ pool.WaitUntilNSuccesses(n)
 pool.AddWorker()
 ```
 
+This is an asynchronous operation, but there is a [way to be be notified each time a new worker is started up: through a channel](#receive-a-notification-every-time-a-new-worker-is-started-up).
+
 #### Add n workers on demand
 
 [AddWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.AddWorkers) adds n new workers to the pool.
@@ -253,6 +275,8 @@ pool.AddWorker()
 ```go
 pool.AddWorkers(n)
 ```
+
+This is an asynchronous operation, but there is a [way to be be notified each time a new worker is started up: through a channel](#receive-a-notification-every-time-a-new-worker-is-started-up).
 
 ### Multiple ways to kill workers
 
@@ -333,6 +357,8 @@ pool.SetTotalWorkers(n)
 
 In case it needs to kill some workers (in order to adjust the total based on the given parameter), it will wait until their current jobs get processed (if they are processing jobs).
 
+This is an asynchronous operation, but there is a [way to be be notified each time a new worker is started up: through a channel](#receive-a-notification-every-time-a-new-worker-is-started-up).
+
 It returns an error in the following scenarios:
  - The workers were not started yet by StartWorkers.
  - There is a "in course" KillAllWorkers operation.
@@ -355,6 +381,10 @@ pool.ResumeAllWorkers()
 ```
 
 ## History
+
+### v0.9.0
+
+- Added a way to know that new workers were started (using an optional channel)
 
 ### v0.8.0
 

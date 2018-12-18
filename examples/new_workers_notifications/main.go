@@ -1,7 +1,8 @@
 // On this example:
 //  - 10 workers will be started up
+//  - the execution will wait until all 10 workers are alive
 //  - 30 jobs will be enqueued to be processed by the workers
-//	- all workers will be killed after the 30 enqueued jobs get processed
+//  - all workers will be killed after the 30 enqueued jobs get processed
 
 package main
 
@@ -14,13 +15,13 @@ import (
 
 func main() {
 	// total workers
-	totalWorkers := 10
+	totalInitialWorkers := 10
 	// max number of pending jobs
 	maxNumberPendingJobs := 15
 	// do not log messages about the pool processing
 	verbose := false
 
-	pool := goworkerpool.NewPool(totalWorkers, maxNumberPendingJobs, verbose)
+	pool := goworkerpool.NewPool(totalInitialWorkers, maxNumberPendingJobs, verbose)
 
 	// add the worker handler function
 	pool.SetWorkerFunc(func(data interface{}) bool {
@@ -33,8 +34,24 @@ func main() {
 		return true
 	})
 
+	// set the channel to receive notifications every time a new worker is started up
+	newWorkerNotificationChannel := make(chan int)
+	pool.SetNewWorkerChan(newWorkerNotificationChannel)
+
 	// start up the workers
 	pool.StartWorkers()
+
+	totalWorkersUp := 0
+	// wait until all initial workers are alive
+	for notification := range newWorkerNotificationChannel {
+		totalWorkersUp = totalWorkersUp + notification
+		if totalWorkersUp == totalInitialWorkers {
+			// break the loop once all initial workers are already up
+			break
+		}
+	}
+
+	log.Printf("%v workers are up\n", totalWorkersUp)
 
 	// enqueue jobs in a separate goroutine
 	go func() {
