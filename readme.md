@@ -1,7 +1,7 @@
 [![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.8.0-yellowgreen.svg?style=flat "goworkerpool v0.8.0")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://travis-ci.org/enriquebris/goworkerpool.svg?branch=master)](https://travis-ci.org/enriquebris/goworkerpool) [![codecov](https://codecov.io/gh/enriquebris/goworkerpool/branch/master/graph/badge.svg)](https://codecov.io/gh/enriquebris/goworkerpool) 
 
 # goworkerpool - Pool of workers
-Pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
+Pool of concurrent workers with the ability of increment / decrement / pause / resume workers on demand.
 
 ## Features
 
@@ -10,6 +10,7 @@ Pool of concurrent workers with the ability to increment / decrement / pause / r
     - [Wait until at least a worker is alive](#wait-until-at-least-a-worker-is-alive)
     - [Wait until n jobs get successfully processed](#wait-until-n-jobs-get-successfully-processed)
 - [Add](#add-workers-on-demand) / [kill](#kill-workers-on-demand) workers on demand
+- Be notified once a worker is [started up](#receive-a-notification-every-time-a-new-worker-is-started-up) / [killed](#receive-a-notification-every-time-a-worker-is-killed)
 - Multiple ways to kill workers:
     - [On demand](#kill-workers-on-demand)
     - [After currently enqueued jobs get processed](#kill-workers-after-currently-enqueued-jobs-get-processed)
@@ -125,6 +126,7 @@ pool.SetWorkerFunc(func(data interface{}) bool {
 
 ### Start up the workers
 
+#### Start up the workers asynchronously
 [StartWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.StartWorkers) spins up the workers. The amount of workers to be started up is defined at the Pool instantiation.
 
 ```go
@@ -132,6 +134,16 @@ pool.StartWorkers()
 ```
 
 This is an asynchronous operation, but there is a way to be be notified each time a new worker is started up: through a channel. See [SetNewWorkerChan(chan)](#receive-a-notification-every-time-a-new-worker-is-started-up).
+
+#### Start up the workers synchronously
+
+[StartWorkersAndWait](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.StartWorkersAndWait) spins up the workers and wait until all of them are 100% up. The amount of workers to be started up is defined at the Pool instantiation.
+
+```go
+pool.StartWorkersAndWait()
+```
+
+Although this is an synchronous operation, there is a way to be be notified each time a new worker is started up: through a channel. See [SetNewWorkerChan(chan)](#receive-a-notification-every-time-a-new-worker-is-started-up). Keep in mind that the channel listener should be running on a different goroutine.
 
 ### Receive a notification every time a new worker is started up
 
@@ -289,6 +301,8 @@ This is an asynchronous operation, but there is a [way to be be notified each ti
 pool.KillWorker()
 ```
 
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
+
 ##### Kill n workers
 
 [KillWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.KillWorkers) kills all live workers. For those currently processing jobs, it will wait until the work is done.
@@ -296,6 +310,8 @@ pool.KillWorker()
 ```go
 pool.KillWorkers(n)
 ```
+
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
 
 ##### Kill all workers
 
@@ -305,6 +321,8 @@ pool.KillWorkers(n)
 pool.KillAllWorkers()
 ```
 
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
+
 ##### Kill all workers and wait
 
 [KillAllWorkersAndWait](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.KillAllWorkersAndWait) triggers an action to kill all live workers and blocks until the action is done (meaning that all live workers are down).
@@ -312,6 +330,8 @@ pool.KillAllWorkers()
 ```go
 pool.KillAllWorkersAndWait()
 ```
+
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
 
 #### Kill workers after currently enqueued jobs get processed
 ##### Kill a worker after currently enqueued jobs get processed
@@ -325,6 +345,8 @@ By "*currently enqueued jobs*" I mean: the jobs enqueued at the moment this func
 pool.LateKillWorker()
 ```
 
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
+
 ##### Kill n workers after currently enqueued jobs get processed
 
 [LateKillWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.LateKillWorkers) kills n workers after currently enqueued jobs get processed.
@@ -335,6 +357,8 @@ By "*currently enqueued jobs*" I mean: the jobs enqueued at the moment this func
 ```go
 pool.LateKillWorkers(n)
 ```
+
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
 
 ##### Kill all workers after currently enqueued jobs get processed
 
@@ -347,7 +371,20 @@ By "*currently enqueued jobs*" I mean: the jobs enqueued at the moment this func
 pool.LateKillAllWorkers()
 ```
 
-### <a name="change-the-number-of-workers-on-demand"></a>Change the number of workers on demand
+This is an asynchronous operation, but there is a way to be be notified each time a worker is killed: through a channel. See [SetKilledWorkerChan(chan)](#receive-a-notification-every-time-a-worker-is-killed).
+
+### Receive a notification every time a worker is killed
+
+[SetKilledWorkerChan(chan)](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.SetKilledWorkerChan) sets a channel to receive notifications every time a worker is killed.
+
+```go
+pool.SetKilledWorkerChan(ch chan int)
+```
+
+This is 100% optional.
+
+
+### <a name="change-the-number-of-workers-on-demand"></a>Update the amount of workers on demand
 
 [SetTotalWorkers](https://godoc.org/github.com/enriquebris/goworkerpool#Pool.SetTotalWorkers) adjusts the number of live workers.
 
@@ -385,6 +422,8 @@ pool.ResumeAllWorkers()
 ### v0.9.0
 
 - Added a way to know that new workers were started (using an optional channel)
+- Added a way to know if a worker was killed (using an optional channel)
+- StartWorkersAndWait() to start workers (for first time) and wait until all of them are alive
 
 ### v0.8.0
 

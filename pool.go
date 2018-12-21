@@ -1,6 +1,6 @@
 // ** goworkerpool.com  **********************************************************************************************
 // ** github.com/enriquebris/goworkerpool  																			**
-// ** v0.8.0  ********************************************************************************************************
+// ** v0.9.0  ********************************************************************************************************
 
 // Package goworkerpool provides a pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
 package goworkerpool
@@ -177,12 +177,12 @@ func (st *Pool) initialize(initialWorkers int, maxJobsInQueue int, verbose bool)
 	st.broadMessages.Store(broadMessageKillAllWorkers, false)
 }
 
-// SetNewWorkerChan sets a channel to send signals after each new worker is started
+// SetNewWorkerChan sets a channel to receive signals after each new worker is started
 func (st *Pool) SetNewWorkerChan(ch chan int) {
 	st.newWorkerChan = ch
 }
 
-// SetKilledWorkerChan sets a channel to receive a signal after worker(s) was/were killed
+// SetKilledWorkerChan sets a channel to receive signals after worker(s) was/were killed
 func (st *Pool) SetKilledWorkerChan(ch chan int) {
 	st.killedWorkerChanel = ch
 }
@@ -272,6 +272,9 @@ func (st *Pool) workerListener() {
 						st.waitForActionKillAllWorkersAndWait <- true
 					}
 				}
+
+				// send signal to let know that a worker was killed
+				st.sendKilledWorkerSignal(message.Value)
 
 			// kill worker(s)
 			case workerActionKill:
@@ -547,7 +550,7 @@ func (st *Pool) AddCallback(callbackFn PoolCallback) error {
 // ** Workers operations  **************************************************************************************
 // *************************************************************************************************************
 
-// StartWorkers start all workers. The number of workers was set at the Pool instantiation (NewPool(...) function).
+// StartWorkers starts all workers. The number of workers was set at the Pool instantiation (NewPool(...) function).
 //
 // This is an asynchronous operation, but you can be notified through a channel every time a new worker is started.
 // The channel (optional) can be defined at SetNewWorkerChan(chan).
@@ -558,6 +561,52 @@ func (st *Pool) StartWorkers() error {
 	for i := 0; i < st.initialWorkers; i++ {
 		if err = st.startWorker(); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// StartWorkersAndWait starts all workers and waits until them are alive.
+//
+// This is a synchronous operation, but can be notified through a channel every time a new worker is started.
+// In order to receive the signals on realtime, the listener should be running on a different goroutine.
+//
+// StartWorkersAndWait will return an error if the worker function was not previously set.
+func (st *Pool) StartWorkersAndWait() error {
+	sendSignalToClient := st.newWorkerChan != nil
+	tmpClientChan := st.newWorkerChan
+
+	// switch back to the client channel
+	defer func(){
+		if sendSignalToClient {
+			st.SetNewWorkerChan(tmpClientChan)
+		}
+	}()
+
+	// custom channel to receive signals for each started up worker
+	tmpCustomChan := make(chan int, st.initialWorkers)
+	// temporarily switch to our temp channel
+	st.SetNewWorkerChan(tmpCustomChan)
+
+	// start up the workers
+	if err := st.StartWorkers(); err != nil {
+		return err
+	}
+
+	totalWorkesUp := 0
+	// start listening to "new worker" signals
+	for message := range tmpCustomChan {
+		totalWorkesUp += message
+
+		// send "new worker" signals to client
+		if sendSignalToClient {
+			tmpClientChan <- message
+		}
+
+		// exit once the amount of workers == st.initialWorkers
+		if totalWorkesUp == st.initialWorkers {
+			break
 		}
 	}
 

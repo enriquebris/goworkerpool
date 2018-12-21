@@ -3,10 +3,12 @@
 //  - the execution will wait until all 10 workers are alive
 //  - 30 jobs will be enqueued to be processed by the workers
 //  - all workers will be killed after the 30 enqueued jobs get processed
+//	- a notification will be sent once a worker is killed (10 notifications will be received)
 
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -34,28 +36,12 @@ func main() {
 		return true
 	})
 
-	// set the channel to receive notifications every time a new worker is started up
-	newWorkerNotificationChannel := make(chan int)
-	pool.SetNewWorkerChan(newWorkerNotificationChannel)
-
-
-	// Note that the following lines (45 to 56) could be replaced by pool.StartWorkersAndWait() to achieve the
-	// same goal: wait until all workers are up. This code is intended as an example.
+	// set the channel to receive notifications every time a worker is killed
+	killedWorkerNotificationChannel := make(chan int)
+	pool.SetKilledWorkerChan(killedWorkerNotificationChannel)
 
 	// start up the workers
 	pool.StartWorkers()
-
-	totalWorkersUp := 0
-	// wait until all initial workers are alive
-	for notification := range newWorkerNotificationChannel {
-		totalWorkersUp = totalWorkersUp + notification
-		if totalWorkersUp == totalInitialWorkers {
-			// break the loop once all initial workers are already up
-			break
-		}
-	}
-
-	log.Printf("%v workers are up\n", totalWorkersUp)
 
 	// enqueue jobs in a separate goroutine
 	go func() {
@@ -67,6 +53,19 @@ func main() {
 		pool.LateKillAllWorkers()
 	}()
 
-	// wait while at least one worker is alive
-	pool.Wait()
+	// Instead of use pool.Wait() to wait until all workers are down, the following loop will be listening to the signals
+	// sent once a worker is killed. The loop will exit after all initial workers were killed.
+	totalKilledWorkers := 0
+	// wait until all initial workers are alive
+	for notification := range killedWorkerNotificationChannel {
+		totalKilledWorkers = totalKilledWorkers + notification
+		fmt.Printf("total killed workers: %v\n", totalKilledWorkers)
+
+		if totalKilledWorkers == totalInitialWorkers {
+			// break the loop once all initial workers are already up
+			break
+		}
+	}
+
+	fmt.Printf("All %v workers are down\n", totalInitialWorkers)
 }

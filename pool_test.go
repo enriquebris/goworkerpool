@@ -113,6 +113,51 @@ func (suite *PoolTestSuite) TestStartWorkersExactAmountOfWorkers() {
 }
 
 // ***************************************************************************************
+// ** StartWorkersAndWait()
+// ***************************************************************************************
+
+// StartWorkersAndWait() with a worker's func at first invoke ==> no error
+func (suite *PoolTestSuite) TestStartWorkersAndWaitWithWorkerHandlerFunction() {
+	// add a dummy worker's func
+	suite.pool.SetWorkerFunc(func(data interface{}) bool { return true })
+	suite.NoError(suite.pool.StartWorkersAndWait(), "StartWorkersAndWait() must return no error having a defined worker's handler function.")
+}
+
+// StartWorkersAndWait() without a worker's func at first invoke ==> error
+func (suite *PoolTestSuite) TestStartWorkersAndWaitNoWorkerHandlerFunction() {
+	suite.Error(suite.pool.StartWorkersAndWait(), "StartWorkersAndWait() must return error if no worker's handler func is defined.")
+}
+
+// verifies that the exact amount of workers (initialWorkers) are started up, not more, not less && the elapsed time between each worker initialization
+func (suite *PoolTestSuite) TestStartWorkersAndWait() {
+	// add a dummy worker's func
+	suite.pool.SetWorkerFunc(func(data interface{}) bool { return true })
+
+	newWorkerChan := make(chan int, initialWorkers * 2)
+	suite.pool.SetNewWorkerChan(newWorkerChan)
+
+	// start listening for the "new worker" signals
+	go func() {
+		totalWorkersUp := 0
+		select {
+		case message := <-newWorkerChan:
+			totalWorkersUp += message
+			if totalWorkersUp == initialWorkers {
+				break
+			}
+		case <-time.After(2 * time.Second):
+			suite.True(false, "Too much time waiting for the workers")
+		}
+	}()
+
+	// start up all workers and wait until them are 100% alive
+	suite.NoError(suite.pool.StartWorkersAndWait(), "Unexpected error fromStartWorkersAndWait()")
+
+	totalWorkers := suite.pool.GetTotalWorkers()
+	suite.Equalf(totalWorkers, initialWorkers, "Expected workers up: %v, Total workers up: %v", initialWorkers, totalWorkers)
+}
+
+// ***************************************************************************************
 // ** Wait()
 // ***************************************************************************************
 
@@ -186,7 +231,19 @@ func (suite *PoolTestSuite) TestWaitUntilNSuccesses() {
 // ** KillWorker()
 // ***************************************************************************************
 
-// only one "kill worker" confirmation must be received after KillWorker()
+// KillWorker() ==> error if KillAllWorkersInCourse() in course
+func (suite *PoolTestSuite) TestKillWorkerWhileKillAllWorkersInCourse() {
+	suite.pool.broadMessages.Store(broadMessageKillAllWorkers, true)
+	suite.Error(suite.pool.KillWorker(), "KillWorker() must return error while KillAllWorkers() in course.")
+}
+
+// KillWorker() ==> nil if KillAllWorkersInCourse() is not in course
+func (suite *PoolTestSuite) TestKillWorkerWhileNotKillAllWorkersInCourse() {
+	suite.pool.broadMessages.Delete(broadMessageKillAllWorkers)
+	suite.NoError(suite.pool.KillWorker(), "KillWorker() must not return an error while KillAllWorkers() is not in course.")
+}
+
+// only one "killed worker" confirmation must be received after KillWorker()
 func (suite *PoolTestSuite) TestKillWorker() {
 	// dummy worker's handler func
 	suite.pool.SetWorkerFunc(func(data interface{}) bool {
@@ -233,6 +290,72 @@ func (suite *PoolTestSuite) TestKillWorker() {
 		break
 	}
 }
+
+// ***************************************************************************************
+// ** KillWorkers(n)
+// ***************************************************************************************
+
+// KillWorkers(n) ==> error if KillAllWorkersInCourse() in course
+func (suite *PoolTestSuite) TestKillWorkersWhileKillAllWorkersInCourse() {
+	suite.pool.broadMessages.Store(broadMessageKillAllWorkers, true)
+	suite.Error(suite.pool.KillWorkers(5), "KillWorkers(n) must return error while KillAllWorkers() in course.")
+}
+
+// KillWorkers(n) ==> nil if KillAllWorkersInCourse() is not in course
+func (suite *PoolTestSuite) TestKillWorkersWhileNotKillAllWorkersInCourse() {
+	suite.pool.broadMessages.Delete(broadMessageKillAllWorkers)
+	suite.NoError(suite.pool.KillWorkers(5), "KillWorkers(n) must not return an error while KillAllWorkers() is not in course.")
+}
+
+/*
+// only n "killed worker" confirmations must be received after KillWorkers(n)
+func (suite *PoolTestSuite) TestKillWorkers() {
+	// dummy worker's handler func
+	suite.pool.SetWorkerFunc(func(data interface{}) bool {
+		return true
+	})
+
+	// channel to receive "new worker" signals
+	ch := make(chan int, initialWorkers)
+	suite.pool.SetNewWorkerChan(ch)
+
+	// start the workers
+	suite.pool.StartWorkers()
+
+	// wait for the first worker up
+	select {
+	case <-ch:
+		break
+	case <-time.After(3 * time.Second):
+		suite.Fail("Too long to spin up workers")
+	}
+
+	// channel to receive "killed worker" signals
+	ch = make(chan int, initialWorkers)
+	suite.pool.SetKilledWorkerChan(ch)
+
+	// kill a worker
+	err := suite.pool.KillWorker()
+	suite.NoError(err, "Error trying to kill a worker: '%v'", err)
+
+	// wait for the "worker killed" signal
+	select {
+	case total := <-ch:
+		suite.Truef(total == 1, "%v workers killed, expected: 1", total)
+	case <-time.After(3 * time.Second):
+		suite.Fail("Too long time waiting for the \"killed worker\" signal")
+	}
+
+	// no more "worker killed" signal should be received
+	select {
+	case total := <-ch:
+		suite.Failf("Extra workers killed", "%v Extra confirmations received", total)
+	case <-time.After(3 * time.Second):
+		// it's ok, no more signals received
+		break
+	}
+}
+*/
 
 // ***************************************************************************************
 // ** KillAllWorkersAndWait()
