@@ -87,6 +87,8 @@ type Pool struct {
 	initialWorkers int
 	// total live workers
 	totalWorkers int
+	// mutex to control totalWorkers access
+	totalWorkersRWMutex sync.RWMutex
 	// tells whether the initialWorkers were started
 	workersStarted bool
 	// tells the workers: do not accept / process new jobs
@@ -235,7 +237,12 @@ func (st *Pool) workerListener() {
 				for i := 0; i < message.Value; i++ {
 					// execute the worker function
 					go st.workerFunc(st.totalWorkers)
+
+					// critical section
+					st.totalWorkersRWMutex.Lock()
 					st.totalWorkers += 1
+					st.totalWorkersRWMutex.Unlock()
+					// critical section END
 
 					// check whether all workers were started
 					if !st.workersStarted && st.totalWorkers == st.initialWorkers {
@@ -991,8 +998,14 @@ func (st *Pool) KillAllWorkers() {
 //  - AddWorkers
 //  - SetTotalWorkers
 func (st *Pool) KillAllWorkersAndWait() {
+	// critical section
+	st.totalWorkersRWMutex.RLock()
+	shouldReturn := st.totalWorkers == 0
+	st.totalWorkersRWMutex.RUnlock()
+	// critical section END
+
 	// exit immediately if total workers == 0
-	if st.totalWorkers == 0 {
+	if shouldReturn {
 		return
 	}
 
@@ -1075,5 +1088,8 @@ func (st *Pool) ResumeAllWorkers() {
 
 // GetTotalWorkers returns the number of active/live workers.
 func (st *Pool) GetTotalWorkers() int {
+	st.totalWorkersRWMutex.RLock()
+	defer st.totalWorkersRWMutex.RUnlock()
+
 	return st.totalWorkers
 }
