@@ -1,5 +1,9 @@
 ## History
 
+### v0.9.0
+
+- Added optional channel to let know that new workers were started
+
 ### v0.8.0
 
  - Enqueue jobs plus callback functions

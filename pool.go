@@ -1,6 +1,6 @@
 // ** goworkerpool.com  **********************************************************************************************
 // ** github.com/enriquebris/goworkerpool  																			**
-// ** v0.8.0  ********************************************************************************************************
+// ** v0.9.0  ********************************************************************************************************
 
 // Package goworkerpool provides a pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
 package goworkerpool
@@ -87,6 +87,8 @@ type Pool struct {
 	initialWorkers int
 	// total live workers
 	totalWorkers int
+	// mutex to control totalWorkers access
+	totalWorkersRWMutex sync.RWMutex
 	// tells whether the initialWorkers were started
 	workersStarted bool
 	// tells the workers: do not accept / process new jobs
@@ -107,6 +109,10 @@ type Pool struct {
 	fnSuccessChan chan bool
 	// channel to send "immediate" action's signals to workers
 	immediateChan chan byte
+	// channel to send signals once new workers are up
+	newWorkerChan chan int
+	// channel to send signals once a worker is killed
+	killedWorkerChanel chan int
 
 	// flag to know whether a Wait() function was called
 	waitFor string
@@ -173,6 +179,23 @@ func (st *Pool) initialize(initialWorkers int, maxJobsInQueue int, verbose bool)
 	st.broadMessages.Store(broadMessageKillAllWorkers, false)
 }
 
+// SetNewWorkerChan sets a channel to receive signals after each new worker is started
+func (st *Pool) SetNewWorkerChan(ch chan int) {
+	st.newWorkerChan = ch
+}
+
+// SetKilledWorkerChan sets a channel to receive signals after worker(s) was/were killed
+func (st *Pool) SetKilledWorkerChan(ch chan int) {
+	st.killedWorkerChanel = ch
+}
+
+// sendKilledWorkerSignal sends an integer signal over a channel (the number of killed workers)
+func (st *Pool) sendKilledWorkerSignal(value int) {
+	if st.killedWorkerChanel != nil {
+		st.killedWorkerChanel <- value
+	}
+}
+
 // workerListener handles all up/down worker operations && keeps workers stats updated (st.totalWorkers)
 func (st *Pool) workerListener() {
 	keepListening := true
@@ -195,6 +218,7 @@ func (st *Pool) workerListener() {
 			// this case is handled by st.fnSuccessListener()
 
 		default:
+			// no waitFor signal
 		}
 
 		// ************************************************************************************
@@ -214,12 +238,22 @@ func (st *Pool) workerListener() {
 				for i := 0; i < message.Value; i++ {
 					// execute the worker function
 					go st.workerFunc(st.totalWorkers)
+
+					// critical section
+					st.totalWorkersRWMutex.Lock()
 					st.totalWorkers += 1
+					st.totalWorkersRWMutex.Unlock()
+					// critical section END
 
 					// check whether all workers were started
 					if !st.workersStarted && st.totalWorkers == st.initialWorkers {
 						// the workers were started
 						st.workersStarted = true
+					}
+
+					// send back a signal to let know that a new worker was started
+					if st.newWorkerChan != nil {
+						st.newWorkerChan <- 1
 					}
 				}
 
@@ -247,6 +281,9 @@ func (st *Pool) workerListener() {
 					}
 				}
 
+				// send signal to let know that a worker was killed
+				st.sendKilledWorkerSignal(message.Value)
+
 			// kill worker(s)
 			case workerActionKill:
 				totalWorkers := st.GetTotalWorkers()
@@ -262,6 +299,8 @@ func (st *Pool) workerListener() {
 			// the worker was killed because a "immediate kill" signal
 			case workerActionKillConfirmation:
 				st.totalWorkers -= message.Value
+				// send signal to let know that a worker was killed
+				st.sendKilledWorkerSignal(message.Value)
 
 			// late kill worker(s)
 			case workerActionLateKill:
@@ -282,6 +321,8 @@ func (st *Pool) workerListener() {
 			// the worker was killed because a "late kill" signal
 			case workerActionLateKillConfirmation:
 				st.totalWorkers -= message.Value
+				// send signal to let know that a worker was killed
+				st.sendKilledWorkerSignal(message.Value)
 
 			// late kill all workers
 			case workerActionLateKillAllWorkers:
@@ -299,11 +340,15 @@ func (st *Pool) workerListener() {
 			// the worker was killed because the immediate channel is closed
 			case workerActionImmediateChanelClosedConfirmation:
 				st.totalWorkers -= message.Value
+				// send signal to let know that a worker was killed
+				st.sendKilledWorkerSignal(message.Value)
 
 			// "panic kill worker" confirmation from the worker
 			// the worker was killed because an unhandled panic
 			case workerActionPanicKillConfirmation:
 				st.totalWorkers -= message.Value
+				// send signal to let know that a worker was killed
+				st.sendKilledWorkerSignal(message.Value)
 
 			// SetTotalWorkers(n)
 			case workerActionSetTotalWorkers:
@@ -357,6 +402,10 @@ func (st *Pool) fnSuccessListener() {
 func (st *Pool) Wait() error {
 	if st.fn == nil {
 		return errors.Errorf(errorNoWorkerFuncMsg, "Wait")
+	}
+
+	if st.GetTotalWorkers() == 0 {
+		return nil
 	}
 
 	// set the waitFor flag for Wait()
@@ -509,13 +558,63 @@ func (st *Pool) AddCallback(callbackFn PoolCallback) error {
 // ** Workers operations  **************************************************************************************
 // *************************************************************************************************************
 
-// StartWorkers start all workers. The number of workers was set at the Pool instantiation (NewPool(...) function).
-// It will return an error if the worker function was not previously set.
+// StartWorkers starts all workers. The number of workers was set at the Pool instantiation (NewPool(...) function).
+//
+// This is an asynchronous operation, but you can be notified through a channel every time a new worker is started.
+// The channel (optional) can be defined at SetNewWorkerChan(chan).
+//
+// StartWorkers will return an error if the worker function was not previously set.
 func (st *Pool) StartWorkers() error {
 	var err error
 	for i := 0; i < st.initialWorkers; i++ {
 		if err = st.startWorker(); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// StartWorkersAndWait starts all workers and waits until them are alive.
+//
+// This is a synchronous operation, but can be notified through a channel every time a new worker is started.
+// In order to receive the signals on realtime, the listener should be running on a different goroutine.
+//
+// StartWorkersAndWait will return an error if the worker function was not previously set.
+func (st *Pool) StartWorkersAndWait() error {
+	sendSignalToClient := st.newWorkerChan != nil
+	tmpClientChan := st.newWorkerChan
+
+	// switch back to the client channel
+	defer func() {
+		if sendSignalToClient {
+			st.SetNewWorkerChan(tmpClientChan)
+		}
+	}()
+
+	// custom channel to receive signals for each started up worker
+	tmpCustomChan := make(chan int, st.initialWorkers)
+	// temporarily switch to our temp channel
+	st.SetNewWorkerChan(tmpCustomChan)
+
+	// start up the workers
+	if err := st.StartWorkers(); err != nil {
+		return err
+	}
+
+	totalWorkesUp := 0
+	// start listening to "new worker" signals
+	for message := range tmpCustomChan {
+		totalWorkesUp += message
+
+		// send "new worker" signals to client
+		if sendSignalToClient {
+			tmpClientChan <- message
+		}
+
+		// exit once the amount of workers == st.initialWorkers
+		if totalWorkesUp == st.initialWorkers {
+			break
 		}
 	}
 
@@ -759,7 +858,10 @@ func (st *Pool) workerFunc(n int) {
 // In case it needs to kill some workers (in order to adjust the total based on the given parameter), it will wait until
 // their current jobs get processed (in case they are processing jobs).
 //
-// It returns an error in the following scenarios:
+// This is an asynchronous operation, but you can be notified through a channel every time a new worker is started.
+// The channel (optional) can be defined at SetNewWorkerChan(chan).
+//
+// SetTotalWorkers returns an error in the following scenarios:
 //  - The workers were not started yet by StartWorkers.
 //  - There is a "in course" KillAllWorkers operation.
 func (st *Pool) SetTotalWorkers(n int) error {
@@ -783,7 +885,11 @@ func (st *Pool) SetTotalWorkers(n int) error {
 }
 
 // AddWorker adds a new worker to the pool.
-// It returns an error if at least one of the following statements is true:
+//
+// This is an asynchronous operation, but you can be notified through a channel every time a new worker is started.
+// The channel (optional) can be defined at SetNewWorkerChan(chan).
+//
+// AddWorker returns an error if at least one of the following statements is true:
 //  - the worker could not be started
 //  - there is a "in course" KillAllWorkers operation
 func (st *Pool) AddWorker() error {
@@ -796,7 +902,11 @@ func (st *Pool) AddWorker() error {
 }
 
 // AddWorkers adds n extra workers to the pool.
-// It returns an error if at least one of the following statements are true:
+//
+// This is an asynchronous operation, but you can be notified through a channel every time a new worker is started.
+// The channel (optional) can be defined at SetNewWorkerChan(chan).
+//
+// AddWorkers returns an error if at least one of the following statements are true:
 //  - the worker could not be started
 //  - there is a "in course" KillAllWorkers operation
 func (st *Pool) AddWorkers(n int) error {
@@ -889,6 +999,17 @@ func (st *Pool) KillAllWorkers() {
 //  - AddWorkers
 //  - SetTotalWorkers
 func (st *Pool) KillAllWorkersAndWait() {
+	// critical section
+	st.totalWorkersRWMutex.RLock()
+	shouldReturn := st.totalWorkers == 0
+	st.totalWorkersRWMutex.RUnlock()
+	// critical section END
+
+	// exit immediately if total workers == 0
+	if shouldReturn {
+		return
+	}
+
 	// the channel acts both as a channel and as a flag (as a flag to let know the pool that it has to send a signal through the channel once all workers are down)
 	st.waitForActionKillAllWorkersAndWait = make(chan bool)
 
@@ -968,5 +1089,8 @@ func (st *Pool) ResumeAllWorkers() {
 
 // GetTotalWorkers returns the number of active/live workers.
 func (st *Pool) GetTotalWorkers() int {
+	st.totalWorkersRWMutex.RLock()
+	defer st.totalWorkersRWMutex.RUnlock()
+
 	return st.totalWorkers
 }
