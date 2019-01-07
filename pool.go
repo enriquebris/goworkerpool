@@ -218,6 +218,7 @@ func (st *Pool) workerListener() {
 			// this case is handled by st.fnSuccessListener()
 
 		default:
+			// no waitFor signal
 		}
 
 		// ************************************************************************************
@@ -585,7 +586,7 @@ func (st *Pool) StartWorkersAndWait() error {
 	tmpClientChan := st.newWorkerChan
 
 	// switch back to the client channel
-	defer func(){
+	defer func() {
 		if sendSignalToClient {
 			st.SetNewWorkerChan(tmpClientChan)
 		}

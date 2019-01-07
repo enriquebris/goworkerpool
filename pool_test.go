@@ -133,7 +133,7 @@ func (suite *PoolTestSuite) TestStartWorkersAndWait() {
 	// add a dummy worker's func
 	suite.pool.SetWorkerFunc(func(data interface{}) bool { return true })
 
-	newWorkerChan := make(chan int, initialWorkers * 2)
+	newWorkerChan := make(chan int, initialWorkers*2)
 	suite.pool.SetNewWorkerChan(newWorkerChan)
 
 	// start listening for the "new worker" signals
@@ -445,7 +445,7 @@ func (suite *PoolTestSuite) TestSetTotalWorkers() {
 // AddTaskCallback ==> error if no new tasks could be enqueued
 func (suite *PoolTestSuite) TestAddTaskCallbackDoNotProcess() {
 	suite.pool.doNotProcess = true
-	suite.Error(suite.pool.AddTaskCallback(nil, func(data interface{}){}), "AddTaskCallback must return error if it is invoked when no new tasks could be enqueued.")
+	suite.Error(suite.pool.AddTaskCallback(nil, func(data interface{}) {}), "AddTaskCallback must return error if it is invoked when no new tasks could be enqueued.")
 }
 
 // ***************************************************************************************
