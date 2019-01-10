@@ -70,8 +70,8 @@ func main() {
 		return true
 	})
 
-	// start up the workers
-	pool.StartWorkers()
+	// start up the workers and wait until them are up
+	pool.StartWorkersAndWait()
 
 	// enqueue jobs in a separate goroutine
 	go func() {
