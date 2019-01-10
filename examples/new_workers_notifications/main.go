@@ -38,8 +38,7 @@ func main() {
 	newWorkerNotificationChannel := make(chan int)
 	pool.SetNewWorkerChan(newWorkerNotificationChannel)
 
-
-	// Note that the following lines (45 to 56) could be replaced by pool.StartWorkersAndWait() to achieve the
+	// Note that the following lines (44 to 55) could be replaced by pool.StartWorkersAndWait() to achieve the
 	// same goal: wait until all workers are up. This code is intended as an example.
 
 	// start up the workers

@@ -40,8 +40,8 @@ func main() {
 	killedWorkerNotificationChannel := make(chan int)
 	pool.SetKilledWorkerChan(killedWorkerNotificationChannel)
 
-	// start up the workers
-	pool.StartWorkers()
+	// start up the workers and wait until them are up
+	pool.StartWorkersAndWait()
 
 	// enqueue jobs in a separate goroutine
 	go func() {
