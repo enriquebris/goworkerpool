@@ -29,8 +29,8 @@ func main() {
 	// add the worker handler function
 	pool.SetWorkerFunc(customWorker.Worker)
 
-	// start up the workers
-	pool.StartWorkers()
+	// start up the workers and wait until them are up
+	pool.StartWorkersAndWait()
 
 	// enqueue jobs in a separate goroutine
 	go func() {
