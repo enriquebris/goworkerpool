@@ -1,6 +1,6 @@
 // ** goworkerpool.com  **********************************************************************************************
 // ** github.com/enriquebris/goworkerpool  																			**
-// ** v0.9.0  ********************************************************************************************************
+// ** v0.9.1  ********************************************************************************************************
 
 // Package goworkerpool provides a pool of concurrent workers with the ability to increment / decrement / pause / resume workers on demand.
 package goworkerpool
