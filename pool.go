@@ -201,29 +201,6 @@ func (st *Pool) workerListener() {
 	keepListening := true
 	for keepListening {
 
-		// ************************************************************************************
-		// ** Process first the following waitFor scenarios:  *********************************
-		// **	- Wait()
-		// ************************************************************************************
-		switch st.waitFor {
-		case waitForWait:
-			if st.workersStarted && st.GetTotalWorkers() == 0 {
-				// reset the st.waitFor variable to avoid processing again the "Wait ready" scenario
-				st.waitFor = ""
-				// send the signal to Wait() to let it know that no workers are alive
-				st.waitForWaitChannel <- true
-			}
-
-		case waitForNSuccesses:
-			// this case is handled by st.fnSuccessListener()
-
-		default:
-			// no waitFor signal
-		}
-
-		// ************************************************************************************
-		// ** Process the actions over the workers  *******************************************
-		// ************************************************************************************
 		select {
 		case message, ok := <-st.totalWorkersChan:
 			// st.totalWorkersChan is closed
@@ -231,6 +208,30 @@ func (st *Pool) workerListener() {
 				keepListening = false
 				break
 			}
+
+			// ************************************************************************************
+			// ** Process first the following waitFor scenarios:  *********************************
+			// **	- Wait()
+			// ************************************************************************************
+			switch st.waitFor {
+			case waitForWait:
+				if st.workersStarted && st.GetTotalWorkers() == 0 {
+					// reset the st.waitFor variable to avoid processing again the "Wait ready" scenario
+					st.waitFor = ""
+					// send the signal to Wait() to let it know that no workers are alive
+					st.waitForWaitChannel <- true
+				}
+
+			case waitForNSuccesses:
+				// this case is handled by st.fnSuccessListener()
+
+			default:
+				// no waitFor signal
+			}
+
+			// ************************************************************************************
+			// ** Process the actions over the workers  *******************************************
+			// ************************************************************************************
 
 			switch message.Action {
 			// add new worker(s)
@@ -369,8 +370,8 @@ func (st *Pool) workerListener() {
 				st.AddWorkers(message.Value - currentTotalWorkers)
 			}
 
-		// no st.totalWorkersChan messages
-		default:
+			// no st.totalWorkersChan messages
+			//default:
 		}
 	}
 }

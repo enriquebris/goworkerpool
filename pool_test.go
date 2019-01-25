@@ -216,7 +216,7 @@ func (suite *PoolTestSuite) TestWaitUntilNSuccesses() {
 	}(successChan, &successCounter)
 
 	// start the workers
-	suite.pool.StartWorkers()
+	suite.pool.StartWorkersAndWait()
 	// enqueue minSuccesses + 1 jobs
 	for i := 0; i < minSuccesses+1; i++ {
 		suite.pool.AddTask(nil)
