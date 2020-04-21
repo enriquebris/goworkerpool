@@ -1,5 +1,30 @@
 ## History
 
+### v0.10.0
+
+- Initial workers automatically start running on pool initialization
+    - deprecated StartWorkers()
+    
+- Each new added worker is being automatically started
+
+- **SafeWaitUntilNSuccesses**: it waits until *n* tasks were successfully processed, but if any extra task is already "in progress", this function will wait until it is done. An extra enqueued task could started processing just before the *nth* expected task was finished.
+
+- **GetTotalWorkersInProgress**: returns total workers in progress.
+
+- **KillAllWorkers** returns error
+- **KillAllWorkersAndWait** returns error
+
+- **SetTotalWorkers** It won't return error because of the workers were not yet started, workers are now started once they are created.
+
+- **WaitUntilInitialWorkersAreUp**: it waits until all initial workers are up and running.
+
+- **StartWorkers** is deprecated. It only returns nil.
+- **StartWorkersAndWait** is deprecated. It returns WaitUntilInitialWorkersAreUp()
+
+### v0.9.1
+
+- Examples: Replaced pool.StartWorkers() by pool.StartWorkersAndWait()
+
 ### v0.9.0
 
 - Added optional channel to let know that new workers were started

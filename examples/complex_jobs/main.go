@@ -19,20 +19,30 @@ type JobData struct {
 }
 
 func main() {
-	// total workers
-	totalWorkers := 10
-	// max number of pending jobs
-	maxNumberPendingJobs := 15
-	// do not show messages about the pool processing
-	verbose := false
+	var (
+		// total workers
+		totalWorkers uint = 10
+		// max number of pending jobs
+		maxNumberPendingJobs uint = 150
+		// do not show messages about the pool processing
+		verbose = false
+	)
 
-	pool := goworkerpool.NewPool(totalWorkers, maxNumberPendingJobs, verbose)
+	pool, err := goworkerpool.NewPoolWithOptions(goworkerpool.PoolOptions{
+		TotalInitialWorkers:          totalWorkers,
+		MaxOperationsInQueue:         maxNumberPendingJobs,
+		MaxWorkers:                   20,
+		WaitUntilInitialWorkersAreUp: true,
+		LogVerbose:                   verbose,
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// add the worker handler function
 	pool.SetWorkerFunc(worker)
-
-	// start up the workers and wait until them are up
-	pool.StartWorkersAndWait()
 
 	// enqueue jobs in a separate goroutine
 	go func() {

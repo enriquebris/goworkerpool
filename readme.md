@@ -1,4 +1,4 @@
-[![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.9.1-yellowgreen.svg?style=flat "goworkerpool v0.9.1")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://travis-ci.org/enriquebris/goworkerpool.svg?branch=master)](https://travis-ci.org/enriquebris/goworkerpool) [![codecov](https://codecov.io/gh/enriquebris/goworkerpool/branch/master/graph/badge.svg)](https://codecov.io/gh/enriquebris/goworkerpool) 
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/mod/github.com/enriquebris/goworkerpool) [![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.10.0-yellowgreen.svg?style=flat "goworkerpool v0.10.0")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://travis-ci.org/enriquebris/goworkerpool.svg?branch=master)](https://travis-ci.org/enriquebris/goworkerpool) [![codecov](https://codecov.io/gh/enriquebris/goworkerpool/branch/master/graph/badge.svg)](https://codecov.io/gh/enriquebris/goworkerpool) 
 
 # goworkerpool - Pool of workers
 Pool of concurrent workers with the ability of increment / decrement / pause / resume workers on demand.
@@ -43,6 +43,7 @@ Visit the [TODO](./todo.md) page.
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -50,16 +51,23 @@ import (
 )
 
 func main() {
-	// total workers
-	totalWorkers := 10
-	// max number of pending jobs in queue
-	maxNumberPendingJobsInQueue := 15
-	// do not log messages about the pool processing
-	verbose := false
+	var (
+		maxOperationsInQueue uint = 50
+	)
+	pool, err := goworkerpool.NewPoolWithOptions(goworkerpool.PoolOptions{
+		TotalInitialWorkers:          10,
+		MaxWorkers:                   20,
+		MaxOperationsInQueue:         maxOperationsInQueue,
+		WaitUntilInitialWorkersAreUp: true,
+		LogVerbose:                   true,
+	})
 
-	pool := goworkerpool.NewPool(totalWorkers, maxNumberPendingJobsInQueue, verbose)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	// add the worker function handler
+	// add the worker handler function
 	pool.SetWorkerFunc(func(data interface{}) bool {
 		log.Printf("processing %v\n", data)
 		// add a 1 second delay (to makes it look as it were processing the job)
@@ -70,15 +78,12 @@ func main() {
 		return true
 	})
 
-	// start up the workers and wait until them are up
-	pool.StartWorkersAndWait()
-
 	// enqueue jobs in a separate goroutine
 	go func() {
-		for i := 0; i < 30; i++ {
+		for i := 0; i < int(maxOperationsInQueue); i++ {
 			pool.AddTask(i)
 		}
-		
+
 		// kill all workers after the currently enqueued jobs get processed
 		pool.LateKillAllWorkers()
 	}()
@@ -418,6 +423,27 @@ pool.ResumeAllWorkers()
 ```
 
 ## History
+
+### v0.10.0
+
+- Initial workers automatically start running on pool initialization
+    - deprecated StartWorkers()
+    
+- Each new added worker is being automatically started
+
+- **SafeWaitUntilNSuccesses**: it waits until *n* tasks were successfully processed, but if any extra task is already "in progress", this function will wait until it is done. An extra enqueued task could started processing just before the *nth* expected task was finished.
+
+- **GetTotalWorkersInProgress**: returns total workers in progress.
+
+- **KillAllWorkers** returns error
+- **KillAllWorkersAndWait** returns error
+
+- **SetTotalWorkers** It won't return error because of the workers were not yet started, workers are now started once they are created.
+
+- **WaitUntilInitialWorkersAreUp**: it waits until all initial workers are up and running.
+
+- **StartWorkers** is deprecated. It only returns nil.
+- **StartWorkersAndWait** is deprecated. It returns WaitUntilInitialWorkersAreUp()
 
 ### v0.9.1
 

@@ -16,14 +16,27 @@ import (
 )
 
 func main() {
-	// total workers
-	totalInitialWorkers := 10
-	// max number of pending jobs
-	maxNumberPendingJobs := 15
-	// do not log messages about the pool processing
-	verbose := false
+	var (
+		// total workers
+		totalWorkers uint = 10
+		// max number of pending jobs
+		maxNumberPendingJobs uint = 150
+		// do not show messages about the pool processing
+		verbose = false
+	)
 
-	pool := goworkerpool.NewPool(totalInitialWorkers, maxNumberPendingJobs, verbose)
+	pool, err := goworkerpool.NewPoolWithOptions(goworkerpool.PoolOptions{
+		TotalInitialWorkers:          totalWorkers,
+		MaxOperationsInQueue:         maxNumberPendingJobs,
+		MaxWorkers:                   20,
+		WaitUntilInitialWorkersAreUp: true,
+		LogVerbose:                   verbose,
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// add the worker handler function
 	pool.SetWorkerFunc(func(data interface{}) bool {
@@ -37,11 +50,8 @@ func main() {
 	})
 
 	// set the channel to receive notifications every time a worker is killed
-	killedWorkerNotificationChannel := make(chan int)
+	killedWorkerNotificationChannel := make(chan int, totalWorkers)
 	pool.SetKilledWorkerChan(killedWorkerNotificationChannel)
-
-	// start up the workers and wait until them are up
-	pool.StartWorkersAndWait()
 
 	// enqueue jobs in a separate goroutine
 	go func() {
@@ -61,11 +71,11 @@ func main() {
 		totalKilledWorkers = totalKilledWorkers + notification
 		fmt.Printf("total killed workers: %v\n", totalKilledWorkers)
 
-		if totalKilledWorkers == totalInitialWorkers {
+		if totalKilledWorkers == int(totalWorkers) {
 			// break the loop once all initial workers are already up
 			break
 		}
 	}
 
-	fmt.Printf("All %v workers are down\n", totalInitialWorkers)
+	fmt.Printf("All %v workers are down\n", totalWorkers)
 }
