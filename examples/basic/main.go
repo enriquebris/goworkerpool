@@ -6,6 +6,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -13,14 +14,21 @@ import (
 )
 
 func main() {
-	// total workers
-	totalWorkers := 10
-	// max number of pending jobs
-	maxNumberPendingJobs := 15
-	// do not log messages about the pool processing
-	verbose := false
+	var (
+		maxOperationsInQueue uint = 50
+	)
+	pool, err := goworkerpool.NewPoolWithOptions(goworkerpool.PoolOptions{
+		TotalInitialWorkers:          10,
+		MaxWorkers:                   20,
+		MaxOperationsInQueue:         maxOperationsInQueue,
+		WaitUntilInitialWorkersAreUp: true,
+		LogVerbose:                   true,
+	})
 
-	pool := goworkerpool.NewPool(totalWorkers, maxNumberPendingJobs, verbose)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	// add the worker handler function
 	pool.SetWorkerFunc(func(data interface{}) bool {
@@ -33,12 +41,9 @@ func main() {
 		return true
 	})
 
-	// start up the workers and wait until them are up
-	pool.StartWorkersAndWait()
-
 	// enqueue jobs in a separate goroutine
 	go func() {
-		for i := 0; i < 30; i++ {
+		for i := 0; i < int(maxOperationsInQueue); i++ {
 			pool.AddTask(i)
 		}
 
