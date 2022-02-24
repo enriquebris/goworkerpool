@@ -378,7 +378,7 @@ func (suite *PoolTestSuite) TestDispatcherActionDoNotSentToWorker() {
 
 	notSupposedToHappenChan := make(chan struct{}, 2)
 	// add a trigger to totalWorkers - 1 ==> fail and wait some short time !!!
-	suite.pool.totalWorkers.SetTriggerOnValue(totalWorkers-1, "error", func() {
+	suite.pool.totalWorkers.SetTriggerOnValue(totalWorkers-1, "error", func(currentValue int, previousValue int) {
 		notSupposedToHappenChan <- struct{}{}
 	})
 

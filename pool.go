@@ -163,9 +163,9 @@ func (st *Pool) initialize(options PoolOptions) {
 	st.totalWorkers = goconcurrentcounter.NewIntChan(0)
 
 	// add a trigger function to send a signal once all initial workers are up
-	st.totalWorkers.SetTriggerOnValue(int(options.TotalInitialWorkers), "WaitUntilInitialWorkersAreUp", func() {
+	st.totalWorkers.SetTriggerOnValue(int(options.TotalInitialWorkers), "WaitUntilInitialWorkersAreUp", func(currentValue int, previousValue int) {
 		// remove the trigger function
-		st.totalWorkers.EnqueueToRunAfterCurrentTriggerFunctions(func() {
+		st.totalWorkers.EnqueueToRunAfterCurrentTriggerFunctions(func(currentValue int, previousValue int) {
 			st.totalWorkers.UnsetTriggerOnValue(int(options.TotalInitialWorkers), "WaitUntilInitialWorkersAreUp")
 		})
 
@@ -198,7 +198,7 @@ func (st *Pool) initialize(options PoolOptions) {
 	}
 
 	// send signal if totalWorkers == 0 (all workers are down)
-	st.totalWorkers.SetTriggerOnValue(0, triggerZeroTotalWorkers, func() {
+	st.totalWorkers.SetTriggerOnValue(0, triggerZeroTotalWorkers, func(currentValue int, previousValue int) {
 		// remove the "killAllWorkersInProgress" flag (if active)
 		if st.getStatus(killAllWorkersInProgress) {
 			st.setStatus(killAllWorkersInProgress, false)
@@ -900,9 +900,9 @@ func (st *Pool) KillAllWorkersAndWait() error {
 	// wait until all workers are down
 	waitForKillAllWorkersAndWait := make(chan struct{}, 1)
 	//	1 - trigger a named function on totalWorkers (0)
-	st.totalWorkers.SetTriggerOnValue(0, "KillAllWorkersAndWait", func() {
+	st.totalWorkers.SetTriggerOnValue(0, "KillAllWorkersAndWait", func(currentValue int, previousValue int) {
 		// enqueue to run after trigger functions
-		st.totalWorkers.EnqueueToRunAfterCurrentTriggerFunctions(func() {
+		st.totalWorkers.EnqueueToRunAfterCurrentTriggerFunctions(func(currentValue int, previousValue int) {
 			//	remove the named trigger
 			st.totalWorkers.UnsetTriggerOnValue(0, "KillAllWorkersAndWait")
 		})
@@ -1019,12 +1019,12 @@ func (st *Pool) Wait() error {
 // TODO ::: An error will be returned if the worker's function is not already set.
 func (st *Pool) WaitUntilNSuccesses(n int) error {
 	wait := make(chan struct{})
-	st.taskSuccesses.SetTriggerOnValue(n, triggerWaitUntilNSuccesses, func() {
+	st.taskSuccesses.SetTriggerOnValue(n, triggerWaitUntilNSuccesses, func(currentValue int, previousValue int) {
 		// kill all workers
 		st.KillAllWorkers()
 
 		// execute just after the trigger functions
-		st.taskSuccesses.EnqueueToRunAfterCurrentTriggerFunctions(func() {
+		st.taskSuccesses.EnqueueToRunAfterCurrentTriggerFunctions(func(currentValue int, previousValue int) {
 			// this function should be executed only once, so let's remove it after it's first call
 			st.taskSuccesses.UnsetTriggerOnValue(n, triggerWaitUntilNSuccesses)
 		})
@@ -1050,9 +1050,9 @@ func (st *Pool) SafeWaitUntilNSuccesses(n int) error {
 	safeWait := make(chan struct{})
 
 	// to be executed once extra workers finished their processing
-	st.totalWorkersInProgress.SetTriggerOnValue(0, "safeSafeWaitUntilNSuccesses", func() {
+	st.totalWorkersInProgress.SetTriggerOnValue(0, "safeSafeWaitUntilNSuccesses", func(currentValue int, previousValue int) {
 		// execute just after the trigger functions
-		st.totalWorkersInProgress.EnqueueToRunAfterCurrentTriggerFunctions(func() {
+		st.totalWorkersInProgress.EnqueueToRunAfterCurrentTriggerFunctions(func(currentValue int, previousValue int) {
 			// this function should be executed only once, let's remove it after the first call
 			st.totalWorkersInProgress.UnsetTriggerOnValue(0, "safeSafeWaitUntilNSuccesses")
 		})
@@ -1062,12 +1062,12 @@ func (st *Pool) SafeWaitUntilNSuccesses(n int) error {
 	})
 
 	// to be executed once successes == n
-	st.taskSuccesses.SetTriggerOnValue(n, triggerWaitUntilNSuccesses, func() {
+	st.taskSuccesses.SetTriggerOnValue(n, triggerWaitUntilNSuccesses, func(currentValue int, previousValue int) {
 		// kill all workers
 		st.KillAllWorkers()
 
 		// execute just after the trigger functions
-		st.taskSuccesses.EnqueueToRunAfterCurrentTriggerFunctions(func() {
+		st.taskSuccesses.EnqueueToRunAfterCurrentTriggerFunctions(func(currentValue int, previousValue int) {
 			// this function should be executed only once, so let's remove it after the first call
 			st.taskSuccesses.UnsetTriggerOnValue(n, triggerWaitUntilNSuccesses)
 		})
