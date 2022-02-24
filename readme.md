@@ -1,4 +1,4 @@
-[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/mod/github.com/enriquebris/goworkerpool) [![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.10.0-yellowgreen.svg?style=flat "goworkerpool v0.10.0")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://travis-ci.org/enriquebris/goworkerpool.svg?branch=master)](https://travis-ci.org/enriquebris/goworkerpool) [![codecov](https://codecov.io/gh/enriquebris/goworkerpool/branch/master/graph/badge.svg)](https://codecov.io/gh/enriquebris/goworkerpool) 
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/mod/github.com/enriquebris/goworkerpool) [![godoc reference](https://img.shields.io/badge/godoc-reference-blue.svg)](https://godoc.org/github.com/enriquebris/goworkerpool) ![version](https://img.shields.io/badge/version-v0.10.1-yellowgreen.svg?style=flat "goworkerpool v0.10.1")  [![Go Report Card](https://goreportcard.com/badge/github.com/enriquebris/goworkerpool)](https://goreportcard.com/report/github.com/enriquebris/goworkerpool)  [![Build Status](https://api.travis-ci.com/enriquebris/goworkerpool.svg?branch=master&status=unknown)](https://app.travis-ci.com/github/enriquebris/goworkerpool) [![codecov](https://codecov.io/gh/enriquebris/goworkerpool/branch/master/graph/badge.svg)](https://codecov.io/gh/enriquebris/goworkerpool) 
 
 # goworkerpool - Pool of workers
 Pool of concurrent workers with the ability of increment / decrement / pause / resume workers on demand.
@@ -25,7 +25,7 @@ Golang version >= 1.9
 ## Installation
 Execute:
 ```bash
-go get -tags v0 github.com/enriquebris/goworkerpool
+go get github.com/enriquebris/goworkerpool
 
 ```
 
@@ -423,6 +423,11 @@ pool.ResumeAllWorkers()
 ```
 
 ## History
+
+### v0.10.1
+
+- Adjusted [goconcurrentcounter](github.com/enriquebris/goconcurrentcounter) parameters
+- Added go.mod && go.sum files
 
 ### v0.10.0
 
